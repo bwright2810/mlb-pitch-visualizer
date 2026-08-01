@@ -30,6 +30,8 @@ export interface Pitch {
     // Trajectory shape
     approachAngle: number; // degrees, negative = downward
     spinAxis: number; // degrees from vertical (0 = top spin, 180 = backspin)
+    // Spin rate for animation
+    spinRateRpm?: number; // actual spin rate for ball rotation animation
   };
 }
 
@@ -61,7 +63,8 @@ export const PITCH_TYPES: Pitch[] = [
       horizontalBreak: -0.3,
       verticalBreak: 0.5,
       approachAngle: -1,
-      spinAxis: 180
+      spinAxis: 180,
+      spinRateRpm: 2400
     }
   },
   {
@@ -91,7 +94,8 @@ export const PITCH_TYPES: Pitch[] = [
       horizontalBreak: 1.2,
       verticalBreak: -0.8,
       approachAngle: -4,
-      spinAxis: 150
+      spinAxis: 150,
+      spinRateRpm: 2200
     }
   },
   {
@@ -121,7 +125,8 @@ export const PITCH_TYPES: Pitch[] = [
       horizontalBreak: -0.2,
       verticalBreak: -2.8,
       approachAngle: -12,
-      spinAxis: 15
+      spinAxis: 15,
+      spinRateRpm: 2800
     }
   },
   {
@@ -151,7 +156,8 @@ export const PITCH_TYPES: Pitch[] = [
       horizontalBreak: -0.8,
       verticalBreak: -1.2,
       approachAngle: -8,
-      spinAxis: 45
+      spinAxis: 45,
+      spinRateRpm: 2700
     }
   },
   {
@@ -181,7 +187,8 @@ export const PITCH_TYPES: Pitch[] = [
       horizontalBreak: 0.8,
       verticalBreak: -1.0,
       approachAngle: -6,
-      spinAxis: 135
+      spinAxis: 135,
+      spinRateRpm: 1900
     }
   },
   {
@@ -211,7 +218,8 @@ export const PITCH_TYPES: Pitch[] = [
       horizontalBreak: -0.6,
       verticalBreak: -0.3,
       approachAngle: -3,
-      spinAxis: 165
+      spinAxis: 165,
+      spinRateRpm: 2500
     }
   },
   {
@@ -241,7 +249,8 @@ export const PITCH_TYPES: Pitch[] = [
       horizontalBreak: 0.2,
       verticalBreak: -2.2,
       approachAngle: -14,
-      spinAxis: 30
+      spinAxis: 30,
+      spinRateRpm: 1500
     }
   },
   {
@@ -271,7 +280,8 @@ export const PITCH_TYPES: Pitch[] = [
       horizontalBreak: 0, // unpredictable
       verticalBreak: -0.5,
       approachAngle: -5,
-      spinAxis: 90
+      spinAxis: 90,
+      spinRateRpm: 300
     }
   }
 ];
