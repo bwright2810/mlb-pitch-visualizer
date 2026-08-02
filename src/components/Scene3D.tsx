@@ -266,8 +266,9 @@ function CameraController({
   const zonePos = new THREE.Vector3(3, 3, 10);
   const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
   
-  const sidePos = new THREE.Vector3(80, 15, 28);
-  const sideLookAt = new THREE.Vector3(-28, 4, 28);
+  // Side view: positioned perpendicular to pitch path, seeing trajectory left-to-right
+  const sidePos = new THREE.Vector3(28, 8, 28);
+  const sideLookAt = new THREE.Vector3(28, 4, 55);
 
   useFrame(() => {
     // Side view: OrbitControls takes over
@@ -321,7 +322,7 @@ function SideViewControls({ enabled }: { enabled: boolean }) {
       enableRotate={true}
       minDistance={15}
       maxDistance={200}
-      target={[-28, 4, 28]}
+      target={[28, 4, 55]}
     />
   );
 }
