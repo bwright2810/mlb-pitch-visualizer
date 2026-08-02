@@ -375,8 +375,8 @@ function CameraController({
 
   const initialPos = new THREE.Vector3(4, 6, MOUND_TO_PLATE + 8);
   const initialLookAt = new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2);
-  // Wide side view to show full trajectory arc from release to plate (zoomed out 10%)
-  const sideViewPos = new THREE.Vector3(31, 13.2, 33);
+  // Wide side view to show full trajectory arc from release to plate (zoomed out more)
+  const sideViewPos = new THREE.Vector3(45, 20, 50);
   const sideViewLookAt = new THREE.Vector3(0, 4, 28);
 
   useFrame(() => {
