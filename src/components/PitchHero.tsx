@@ -151,7 +151,7 @@ const PitchHero: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* 3D Visualizer */}
           <div className={`lg:col-span-2 rounded-2xl overflow-hidden shadow-2xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <div className="aspect-[3/2] sm:aspect-[4/3] lg:aspect-[9/10] relative">
+            <div className="aspect-[15/14] sm:aspect-[20/21] lg:aspect-[9/14] relative">
               <Scene3D
                 pitch={selectedPitch}
                 isAnimating={isAnimating}
