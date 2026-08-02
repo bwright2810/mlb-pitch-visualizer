@@ -266,9 +266,10 @@ function CameraController({
   const zonePos = new THREE.Vector3(3, 3, 10);
   const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
   
-  // Side view: positioned perpendicular to pitch path, seeing trajectory left-to-right
-  const sidePos = new THREE.Vector3(28, 8, 28);
-  const sideLookAt = new THREE.Vector3(28, 4, 55);
+  // Side view: positioned on the right side of the field, looking at strike zone
+  // Pitch travels from z≈55 (pitcher) to z≈0 (home plate)
+  const sidePos = new THREE.Vector3(50, 10, 25);
+  const sideLookAt = new THREE.Vector3(0, 2.5, 25);
 
   useFrame(() => {
     // Side view: OrbitControls takes over
@@ -322,7 +323,7 @@ function SideViewControls({ enabled }: { enabled: boolean }) {
       enableRotate={true}
       minDistance={15}
       maxDistance={200}
-      target={[28, 4, 55]}
+      target={[0, 2.5, 25]}
     />
   );
 }
