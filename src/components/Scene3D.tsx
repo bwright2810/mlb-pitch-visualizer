@@ -5,6 +5,11 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, Line, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { Pitch } from '@/types/pitch';
+import {
+  calculateBallPosition,
+  calculateTrajectoryPoints,
+  TrajectoryParams
+} from '@/lib/trajectory';
 
 // Constants for baseball field dimensions (in feet)
 const MOUND_TO_PLATE = 60.5;
@@ -20,70 +25,92 @@ interface BaseballProps {
   onPositionUpdate?: (pos: THREE.Vector3) => void;
 }
 
-// Create a baseball with proper seam geometry - larger scale for visibility
-function BaseballMesh({ position }: { position: [number, number, number] }) {
+/**
+ * Convert Pitch trajectory data to TrajectoryParams for physics calculation.
+ * Handles both old and new trajectory formats.
+ */
+function toTrajectoryParams(trajectory: Pitch['trajectory']): TrajectoryParams {
+  // Handle new format with inducedVerticalBreak and horizontalBreak in inches
+  return {
+    releaseX: trajectory.releaseX,
+    releaseY: trajectory.releaseY,
+    releaseZ: trajectory.releaseZ,
+    targetX: trajectory.targetX,
+    targetY: trajectory.targetY,
+    velocityMph: trajectory.velocityMph,
+    inducedVerticalBreak: trajectory.inducedVerticalBreak,
+    horizontalBreak: trajectory.horizontalBreak,
+    isKnuckleball: trajectory.spinRateRpm < 500 // Knuckleballs have very low spin
+  };
+}
+
+// Create a realistic baseball with proper seam pattern
+function BaseballMesh() {
   return (
-    <group position={position} scale={3}>
-      {/* Main ball - white leather with slight glow */}
+    <group scale={1.2}>
+      {/* Main ball - white leather */}
       <mesh castShadow>
-        <sphereGeometry args={[0.15, 32, 32]} />
-        <meshStandardMaterial color="#f8f8f8" roughness={0.3} emissive="#ffffff" emissiveIntensity={0.2} />
+        <sphereGeometry args={[0.12, 48, 48]} />
+        <meshStandardMaterial color="#f5f5f5" roughness={0.5} />
       </mesh>
-      
-      {/* Red seams - larger torus for visibility */}
-      {/* Left seam */}
-      <mesh position={[-0.02, 0, 0]} rotation={[0, 0, Math.PI / 4]}>
-        <torusGeometry args={[0.1, 0.018, 8, 32, Math.PI * 1.5]} />
-        <meshStandardMaterial color="#c41e3a" roughness={0.4} emissive="#c41e3a" emissiveIntensity={0.3} />
+
+      {/* Baseball seams - figure-8 pattern */}
+      <group>
+        {/* Left side seam */}
+        <mesh rotation={[0, 0, Math.PI / 6]} position={[0, 0, 0.02]}>
+          <torusGeometry args={[0.09, 0.012, 8, 32, Math.PI * 0.8]} />
+          <meshStandardMaterial color="#b91c1c" roughness={0.6} />
+        </mesh>
+        <mesh rotation={[0.8, 0, Math.PI / 3]} position={[-0.02, 0, 0]}>
+          <torusGeometry args={[0.085, 0.012, 8, 32, Math.PI * 0.7]} />
+          <meshStandardMaterial color="#b91c1c" roughness={0.6} />
+        </mesh>
+        <mesh rotation={[1.6, 0, Math.PI / 4]} position={[0, -0.01, -0.02]}>
+          <torusGeometry args={[0.08, 0.012, 8, 32, Math.PI * 0.75]} />
+          <meshStandardMaterial color="#b91c1c" roughness={0.6} />
+        </mesh>
+      </group>
+
+      {/* Right side seam (mirrored) */}
+      <group>
+        <mesh rotation={[0, 0, -Math.PI / 6]} position={[0, 0, 0.02]}>
+          <torusGeometry args={[0.09, 0.012, 8, 32, Math.PI * 0.8]} />
+          <meshStandardMaterial color="#b91c1c" roughness={0.6} />
+        </mesh>
+        <mesh rotation={[-0.8, 0, -Math.PI / 3]} position={[0.02, 0, 0]}>
+          <torusGeometry args={[0.085, 0.012, 8, 32, Math.PI * 0.7]} />
+          <meshStandardMaterial color="#b91c1c" roughness={0.6} />
+        </mesh>
+        <mesh rotation={[-1.6, 0, -Math.PI / 4]} position={[0, -0.01, -0.02]}>
+          <torusGeometry args={[0.08, 0.012, 8, 32, Math.PI * 0.75]} />
+          <meshStandardMaterial color="#b91c1c" roughness={0.6} />
+        </mesh>
+      </group>
+
+      {/* Cross seams */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
+        <torusGeometry args={[0.07, 0.01, 6, 16, Math.PI * 0.3]} />
+        <meshStandardMaterial color="#b91c1c" roughness={0.6} />
       </mesh>
-      
-      {/* Right seam */}
-      <mesh position={[0.02, 0, 0]} rotation={[0, 0, -Math.PI / 4]}>
-        <torusGeometry args={[0.1, 0.018, 8, 32, Math.PI * 1.5]} />
-        <meshStandardMaterial color="#c41e3a" roughness={0.4} emissive="#c41e3a" emissiveIntensity={0.3} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.08, 0]}>
+        <torusGeometry args={[0.07, 0.01, 6, 16, Math.PI * 0.3]} />
+        <meshStandardMaterial color="#b91c1c" roughness={0.6} />
       </mesh>
     </group>
   );
 }
 
-// Calculate ball trajectory position (shared logic)
-function calculateBallPosition(
-  trajectory: Pitch['trajectory'], 
-  progress: number, 
-  showResult: boolean
-): THREE.Vector3 {
-  const pitcherZ = MOUND_TO_PLATE - 1;
-  const releaseZ = pitcherZ - 2; // Ball released 2 feet in front of pitcher
-  
-  if (showResult) {
-    // Final position at home plate
-    const x = trajectory.horizontalBreak;
-    const y = trajectory.verticalBreak + 2.5;
-    return new THREE.Vector3(x, Math.max(0.5, y), 0.5);
-  }
-  
-  const t = progress;
-  
-  // Interpolate from release point to home plate
-  const z = releaseZ * (1 - t) + 0.5 * t;
-  
-  // Apply break - movement increases as ball gets closer (late break)
-  const breakMultiplier = Math.pow(t, 1.5);
-  const x = trajectory.releaseX * (1 - t) + trajectory.horizontalBreak * breakMultiplier;
-  const y = trajectory.releaseY * (1 - t) + trajectory.verticalBreak * breakMultiplier + 2.5;
-  
-  // Always ensure ball is above ground
-  return new THREE.Vector3(x, Math.max(0.5, y), z);
-}
-
 function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpdate }: BaseballProps) {
-  const groupRef = useRef<THREE.Group>(null);
+  const spinGroupRef = useRef<THREE.Group>(null);
   const [rotationSpeed, setRotationSpeed] = useState(0.1);
 
-  // Calculate current position
+  // Convert to physics params
+  const params = useMemo(() => toTrajectoryParams(trajectory), [trajectory]);
+
+  // Calculate current position using physics-based model
   const currentPos = useMemo(() => {
-    return calculateBallPosition(trajectory, progress, showResult);
-  }, [progress, trajectory, showResult]);
+    return calculateBallPosition(params, progress, showResult);
+  }, [params, progress, showResult]);
 
   // Update parent with ball position
   useEffect(() => {
@@ -92,31 +119,35 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
     }
   }, [currentPos, onPositionUpdate]);
 
-  // Rotation speed - spin faster during animation for visual effect
+  // Spin faster during animation - scale by spin rate for realism
   useEffect(() => {
-    setRotationSpeed(isAnimating ? 8 : 0.05); // Much faster spin during pitch
-  }, [isAnimating]);
+    const spinMultiplier = trajectory.spinRateRpm > 1000
+      ? Math.min(trajectory.spinRateRpm / 1500, 3) // Scale with spin rate
+      : 0.3; // Slow spin for knuckleball
+    setRotationSpeed(isAnimating ? spinMultiplier : 0.05);
+  }, [isAnimating, trajectory.spinRateRpm]);
 
-  // Spin the ball
+  // Spin only the inner group (ball mesh), not the position
   useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.x += rotationSpeed * delta;
-      groupRef.current.rotation.z += rotationSpeed * delta * 0.5;
+    if (spinGroupRef.current) {
+      spinGroupRef.current.rotation.x += rotationSpeed * delta;
+      spinGroupRef.current.rotation.z += rotationSpeed * delta * 0.5;
     }
   });
 
   return (
-    <group ref={groupRef}>
-      <BaseballMesh position={[currentPos.x, currentPos.y, currentPos.z]} />
-      {/* Glow effect during animation - larger and more visible */}
+    <group position={[currentPos.x, currentPos.y, currentPos.z]}>
+      <group ref={spinGroupRef}>
+        <BaseballMesh />
+      </group>
+      {/* Glow effect during animation */}
       {isAnimating && (
         <>
-          <mesh position={[currentPos.x, currentPos.y, currentPos.z]}>
+          <mesh>
             <sphereGeometry args={[0.8, 16, 16]} />
             <meshBasicMaterial color="#60a5fa" transparent opacity={0.25} />
           </mesh>
-          {/* Inner glow */}
-          <mesh position={[currentPos.x, currentPos.y, currentPos.z]}>
+          <mesh>
             <sphereGeometry args={[0.5, 16, 16]} />
             <meshBasicMaterial color="#93c5fd" transparent opacity={0.35} />
           </mesh>
@@ -126,197 +157,66 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
   );
 }
 
-// Trajectory line that shows the path
-function TrajectoryLine({ 
-  trajectory, 
-  progress, 
-  showResult 
-}: { 
-  trajectory: Pitch['trajectory']; 
-  progress: number; 
+// Trajectory line - shows the ball's path
+function TrajectoryLine({
+  trajectory,
+  progress,
+  showResult
+}: {
+  trajectory: Pitch['trajectory'];
+  progress: number;
   showResult: boolean;
 }) {
+  const params = useMemo(() => toTrajectoryParams(trajectory), [trajectory]);
+
   const points = useMemo(() => {
-    const numPoints = showResult ? 100 : Math.floor(progress * 100) + 1;
-    const linePoints: THREE.Vector3[] = [];
-    
-    for (let i = 0; i < numPoints; i++) {
-      const t = showResult ? i / 99 : (i / 100) * progress;
-      const pos = calculateBallPosition(trajectory, t, false);
-      linePoints.push(pos);
+    if (showResult) {
+      // Show full trajectory after pitch completes
+      return calculateTrajectoryPoints(params, 120);
+    } else if (progress > 0.02) {
+      // Show trailing path during animation
+      const trailPoints: THREE.Vector3[] = [];
+      const startProgress = Math.max(0, progress - 0.15);
+      const numPoints = Math.max(2, Math.floor((progress - startProgress) * 150));
+      for (let i = 0; i <= numPoints; i++) {
+        const t = startProgress + (i / numPoints) * (progress - startProgress);
+        trailPoints.push(calculateBallPosition(params, t, false));
+      }
+      return trailPoints;
     }
-    
-    return linePoints;
-  }, [progress, trajectory, showResult]);
+    return [];
+  }, [params, progress, showResult]);
 
   if (points.length < 2) return null;
 
   return (
     <Line
       points={points}
-      color="#3b82f6"
-      lineWidth={3}
-      opacity={0.8}
+      color="#60a5fa"
+      lineWidth={2}
+      opacity={showResult ? 0.8 : 0.6}
       transparent
     />
   );
 }
 
-// Generic Pitcher model
-function Pitcher({ pitchProgress, isAnimating }: { pitchProgress: number; isAnimating: boolean }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const armRef = useRef<THREE.Group>(null);
-  const frontLegRef = useRef<THREE.Group>(null);
-  
-  // Pitcher position on mound
-  const pitcherZ = MOUND_TO_PLATE - 1;
-  
-  useFrame(() => {
-    if (!groupRef.current) return;
-    
-    if (isAnimating && pitchProgress < 0.3) {
-      // Wind-up phase - leg lift and arm back
-      const phase = pitchProgress / 0.3;
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(0, -0.4, phase);
-      if (frontLegRef.current) {
-        frontLegRef.current.rotation.x = THREE.MathUtils.lerp(0, -0.8, phase);
-      }
-      if (armRef.current) {
-        armRef.current.rotation.x = THREE.MathUtils.lerp(0, -1.2, phase);
-      }
-    } else if (isAnimating && pitchProgress >= 0.3 && pitchProgress < 0.5) {
-      // Throw phase - arm comes forward rapidly
-      const phase = (pitchProgress - 0.3) / 0.2;
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(-0.4, 0.3, phase);
-      if (frontLegRef.current) {
-        frontLegRef.current.rotation.x = THREE.MathUtils.lerp(-0.8, 0, phase);
-      }
-      if (armRef.current) {
-        armRef.current.rotation.x = THREE.MathUtils.lerp(-1.2, 1.0, phase);
-      }
-    } else if (isAnimating && pitchProgress >= 0.5) {
-      // Follow through
-      const phase = Math.min((pitchProgress - 0.5) / 0.3, 1);
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(0.3, 0.1, phase);
-      if (armRef.current) {
-        armRef.current.rotation.x = THREE.MathUtils.lerp(1.0, 0.5, phase);
-      }
-    } else {
-      // Reset to ready position
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, 0, 0.05);
-      if (frontLegRef.current) {
-        frontLegRef.current.rotation.x = THREE.MathUtils.lerp(frontLegRef.current.rotation.x, 0, 0.05);
-      }
-      if (armRef.current) {
-        armRef.current.rotation.x = THREE.MathUtils.lerp(armRef.current.rotation.x, 0, 0.05);
-      }
-    }
-  });
-  
-  return (
-    <group ref={groupRef} position={[0, 0, pitcherZ]}>
-      {/* Body/Torso - jersey */}
-      <mesh position={[0, 3.5, 0]} castShadow>
-        <capsuleGeometry args={[0.35, 1.2, 8, 16]} />
-        <meshStandardMaterial color="#1e3a5f" roughness={0.7} />
-      </mesh>
-      
-      {/* Head */}
-      <mesh position={[0, 4.8, 0]} castShadow>
-        <sphereGeometry args={[0.35, 16, 16]} />
-        <meshStandardMaterial color="#d4a574" roughness={0.6} />
-      </mesh>
-      
-      {/* Cap */}
-      <mesh position={[0, 5.15, 0]} castShadow>
-        <cylinderGeometry args={[0.38, 0.42, 0.2, 16]} />
-        <meshStandardMaterial color="#1e3a5f" roughness={0.8} />
-      </mesh>
-      <mesh position={[0, 5.1, 0.35]} rotation={[0.3, 0, 0]} castShadow>
-        <boxGeometry args={[0.55, 0.05, 0.4]} />
-        <meshStandardMaterial color="#1e3a5f" roughness={0.8} />
-      </mesh>
-      
-      {/* Throwing arm (right arm for RHP) */}
-      <group ref={armRef} position={[0.45, 4, 0]}>
-        {/* Upper arm */}
-        <mesh position={[0.25, 0, 0]} rotation={[0, 0, -Math.PI / 6]} castShadow>
-          <capsuleGeometry args={[0.12, 0.5, 8, 16]} />
-          <meshStandardMaterial color="#d4a574" roughness={0.6} />
-        </mesh>
-        {/* Forearm */}
-        <mesh position={[0.5, -0.2, 0]} rotation={[0, 0, -Math.PI / 4]} castShadow>
-          <capsuleGeometry args={[0.1, 0.45, 8, 16]} />
-          <meshStandardMaterial color="#d4a574" roughness={0.6} />
-        </mesh>
-        {/* Hand */}
-        <mesh position={[0.65, -0.35, 0]} castShadow>
-          <sphereGeometry args={[0.1, 8, 8]} />
-          <meshStandardMaterial color="#d4a574" roughness={0.6} />
-        </mesh>
-      </group>
-      
-      {/* Glove arm (left arm) - held in front */}
-      <group position={[-0.45, 4, 0]}>
-        <mesh position={[-0.3, 0.1, 0.3]} rotation={[0.5, 0.3, Math.PI / 6]} castShadow>
-          <capsuleGeometry args={[0.12, 0.5, 8, 16]} />
-          <meshStandardMaterial color="#d4a574" roughness={0.6} />
-        </mesh>
-        {/* Glove */}
-        <mesh position={[-0.55, 0.1, 0.5]} castShadow>
-          <sphereGeometry args={[0.22, 12, 12]} />
-          <meshStandardMaterial color="#8B4513" roughness={0.9} />
-        </mesh>
-      </group>
-      
-      {/* Legs */}
-      <group position={[0, 2.2, 0]}>
-        {/* Back leg (pivot/plant foot) */}
-        <mesh position={[-0.2, -0.8, 0]} castShadow>
-          <capsuleGeometry args={[0.15, 1.4, 8, 16]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.7} />
-        </mesh>
-        {/* Front leg (stride leg) */}
-        <group ref={frontLegRef} position={[0.2, -0.8, 0]}>
-          <mesh castShadow>
-            <capsuleGeometry args={[0.15, 1.4, 8, 16]} />
-            <meshStandardMaterial color="#ffffff" roughness={0.7} />
-          </mesh>
-          {/* Cleat */}
-          <mesh position={[0, -0.9, 0.05]} castShadow>
-            <boxGeometry args={[0.2, 0.1, 0.35]} />
-            <meshStandardMaterial color="#333333" roughness={0.9} />
-          </mesh>
-        </group>
-      </group>
-      
-      {/* Back cleat */}
-      <mesh position={[-0.2, 0.6, 0.05]} castShadow>
-        <boxGeometry args={[0.2, 0.1, 0.35]} />
-        <meshStandardMaterial color="#333333" roughness={0.9} />
-      </mesh>
-    </group>
-  );
-}
-
-// Landing indicator in strike zone - positioned at home plate
-function LandingIndicator({ 
-  trajectory, 
-  showResult 
-}: { 
-  trajectory: Pitch['trajectory']; 
+// Landing indicator at strike zone
+function LandingIndicator({
+  trajectory,
+  showResult
+}: {
+  trajectory: Pitch['trajectory'];
   showResult: boolean;
 }) {
   if (!showResult) return null;
 
-  const x = trajectory.horizontalBreak;
-  const y = trajectory.verticalBreak + 2.5;
+  const x = trajectory.targetX;
+  const y = trajectory.targetY;
   const zoneBottom = 1.5;
-  const zoneCenter = zoneBottom + STRIKE_ZONE_HEIGHT / 2;
 
-  const isInZone = Math.abs(x) < STRIKE_ZONE_WIDTH / 2 && 
-                   y > zoneBottom && 
-                   y < zoneBottom + STRIKE_ZONE_HEIGHT;
+  const isInZone = Math.abs(x) < STRIKE_ZONE_WIDTH / 2 &&
+    y > zoneBottom &&
+    y < zoneBottom + STRIKE_ZONE_HEIGHT;
 
   return (
     <group position={[x, y, 0.5]}>
@@ -342,13 +242,13 @@ function PitchersMound() {
         <circleGeometry args={[9, 64]} />
         <meshStandardMaterial color="#8B4513" roughness={0.9} />
       </mesh>
-      
+
       {/* Rubber */}
       <mesh position={[0, MOUND_HEIGHT + 0.02, 0]} castShadow>
         <boxGeometry args={[0.6, 0.03, 0.15]} />
         <meshStandardMaterial color="#ffffff" />
       </mesh>
-      
+
       {/* Raised center */}
       <mesh position={[0, MOUND_HEIGHT / 2, 0]} castShadow>
         <coneGeometry args={[5.5, MOUND_HEIGHT, 32]} />
@@ -361,7 +261,6 @@ function PitchersMound() {
 function HomePlate() {
   return (
     <group position={[0, 0.02, 0]}>
-      {/* Home plate shape (pentagon) */}
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, Math.PI / 2]}>
         <circleGeometry args={[0.9, 5]} />
         <meshStandardMaterial color="#ffffff" roughness={0.3} />
@@ -381,9 +280,8 @@ function StrikeZone() {
         <boxGeometry args={[STRIKE_ZONE_WIDTH, STRIKE_ZONE_HEIGHT, 0.02]} />
         <meshStandardMaterial color="#3b82f6" transparent opacity={0.15} />
       </mesh>
-      
-      {/* Zone outline - all 4 edges */}
-      {/* Top */}
+
+      {/* Zone outline */}
       <Line
         points={[
           [-STRIKE_ZONE_WIDTH/2, STRIKE_ZONE_HEIGHT/2, 0],
@@ -392,7 +290,6 @@ function StrikeZone() {
         color="#60a5fa"
         lineWidth={2}
       />
-      {/* Bottom */}
       <Line
         points={[
           [-STRIKE_ZONE_WIDTH/2, -STRIKE_ZONE_HEIGHT/2, 0],
@@ -401,7 +298,6 @@ function StrikeZone() {
         color="#60a5fa"
         lineWidth={2}
       />
-      {/* Left */}
       <Line
         points={[
           [-STRIKE_ZONE_WIDTH/2, -STRIKE_ZONE_HEIGHT/2, 0],
@@ -410,7 +306,6 @@ function StrikeZone() {
         color="#60a5fa"
         lineWidth={2}
       />
-      {/* Right */}
       <Line
         points={[
           [STRIKE_ZONE_WIDTH/2, -STRIKE_ZONE_HEIGHT/2, 0],
@@ -419,8 +314,8 @@ function StrikeZone() {
         color="#60a5fa"
         lineWidth={2}
       />
-      
-      {/* Cross lines for visual reference */}
+
+      {/* Cross lines */}
       <Line
         points={[
           [-STRIKE_ZONE_WIDTH/2, 0, 0],
@@ -453,7 +348,7 @@ function BaseballField() {
         <planeGeometry args={[90, MOUND_TO_PLATE + 30]} />
         <meshStandardMaterial color="#C4A484" roughness={0.95} />
       </mesh>
-      
+
       {/* Grass approaching from outfield */}
       <mesh position={[0, -0.01, -50]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[200, 100]} />
@@ -463,13 +358,13 @@ function BaseballField() {
   );
 }
 
-function CameraController({ 
-  pitchProgress, 
-  isAnimating, 
+function CameraController({
+  pitchProgress,
+  isAnimating,
   showResult,
   ballPosition
-}: { 
-  pitchProgress: number; 
+}: {
+  pitchProgress: number;
   isAnimating: boolean;
   showResult: boolean;
   ballPosition: THREE.Vector3;
@@ -477,56 +372,43 @@ function CameraController({
   const { camera } = useThree();
   const targetPosition = useRef(new THREE.Vector3(3, 8, MOUND_TO_PLATE + 5));
   const targetLookAt = useRef(new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2));
-  
-  // Initial view position (behind and to the side of pitcher)
+
   const initialPos = new THREE.Vector3(4, 6, MOUND_TO_PLATE + 8);
   const initialLookAt = new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2);
-  
-  // Side view position for result
-  const sideViewPos = new THREE.Vector3(12, 4, 15);
-  const sideViewLookAt = new THREE.Vector3(0, 2.5, 5);
+  const sideViewPos = new THREE.Vector3(10, 3, 8);
+  const sideViewLookAt = new THREE.Vector3(0, 2.5, 2);
 
   useFrame(() => {
     if (isAnimating) {
-      // Gentle camera tracking - stays mostly behind pitcher with subtle movement
       const t = pitchProgress;
-      
-      // Camera drifts forward slightly but stays behind pitcher area
-      const camZ = MOUND_TO_PLATE + 5 - t * 8; // Subtle forward drift, stays positive
-      const camX = 4 - t * 1.5; // Subtle horizontal shift
-      const camY = 6 - t * 1; // Subtle height decrease
-      
+
+      const camZ = MOUND_TO_PLATE + 5 - t * (MOUND_TO_PLATE - 10);
+      const camX = 4 - t * 3;
+      const camY = 6 - t * 2;
+
       targetPosition.current.set(
-        Math.max(camX, 1), 
-        Math.max(camY, 3), 
-        Math.max(camZ, 15)
+        Math.max(camX, 2),
+        Math.max(camY, 2.5),
+        Math.max(camZ, 8)
       );
-      
-      // Look at ball with smooth interpolation
+
       targetLookAt.current.lerp(
-        new THREE.Vector3(
-          ballPosition.x * 0.3,
-          Math.max(ballPosition.y * 0.5 + 2, 2),
-          ballPosition.z * 0.5 + 10
-        ),
-        0.05
+        new THREE.Vector3(ballPosition.x, ballPosition.y, ballPosition.z),
+        0.15
       );
-      
+
       camera.lookAt(targetLookAt.current);
     } else if (showResult) {
-      // Smooth transition to side view
-      targetPosition.current.lerp(sideViewPos, 0.02);
-      targetLookAt.current.lerp(sideViewLookAt, 0.03);
+      targetPosition.current.lerp(sideViewPos, 0.08);
+      targetLookAt.current.lerp(sideViewLookAt, 0.1);
       camera.lookAt(targetLookAt.current);
     } else {
-      // Return to initial view smoothly
-      targetPosition.current.lerp(initialPos, 0.02);
-      targetLookAt.current.lerp(initialLookAt, 0.03);
-      camera.lookAt(targetLookAt.current);
+      targetPosition.current.lerp(initialPos, 0.05);
+      targetLookAt.current.lerp(initialLookAt, 0.05);
+      camera.lookAt(initialLookAt);
     }
-    
-    // Smooth camera movement
-    camera.position.lerp(targetPosition.current, 0.03);
+
+    camera.position.lerp(targetPosition.current, 0.05);
   });
 
   return null;
@@ -540,70 +422,55 @@ interface Scene3DProps {
 }
 
 export default function Scene3D({ pitch, isAnimating, progress, showResult }: Scene3DProps) {
-  const [ballPosition, setBallPosition] = useState<THREE.Vector3>(
-    calculateBallPosition(pitch.trajectory, 0, false)
-  );
-  
-  // Calculate current ball position for camera tracking
-  const currentBallPos = useMemo(() => {
-    return calculateBallPosition(pitch.trajectory, progress, showResult);
-  }, [pitch.trajectory, progress, showResult]);
+  const [ballPosition, setBallPosition] = useState(new THREE.Vector3(0, 5, 55));
 
   return (
     <Canvas
       shadows
-      className="w-full h-full"
-      camera={{ position: [3, 8, MOUND_TO_PLATE + 5], fov: 50, near: 0.1, far: 200 }}
+      camera={{ position: [4, 6, MOUND_TO_PLATE + 8], fov: 50 }}
+      style={{ background: '#0a0a0a' }}
     >
-      {/* Lighting */}
-      <ambientLight intensity={0.5} />
+      <ambientLight intensity={0.4} />
       <directionalLight
-        position={[50, 50, 30]}
-        intensity={1.2}
+        position={[10, 20, 10]}
+        intensity={1}
         castShadow
         shadow-mapSize={[2048, 2048]}
       />
-      <pointLight position={[0, 20, 30]} intensity={0.5} />
-      
-      {/* Environment */}
-      <Environment preset="sunset" />
-      
-      {/* Camera controller */}
-      <CameraController 
-        pitchProgress={progress} 
-        isAnimating={isAnimating} 
-        showResult={showResult}
-        ballPosition={currentBallPos}
-      />
-      
-      {/* Field elements */}
+      <pointLight position={[0, 10, 30]} intensity={0.5} />
+
       <BaseballField />
       <PitchersMound />
       <HomePlate />
       <StrikeZone />
-      
-      {/* Pitcher */}
-      <Pitcher pitchProgress={progress} isAnimating={isAnimating} />
-      
-      {/* Trajectory line */}
-      <TrajectoryLine 
-        trajectory={pitch.trajectory} 
-        progress={progress} 
-        showResult={showResult}
-      />
-      
-      {/* Landing indicator */}
-      <LandingIndicator trajectory={pitch.trajectory} showResult={showResult} />
-      
-      {/* Baseball */}
+
       <Baseball
         trajectory={pitch.trajectory}
         isAnimating={isAnimating}
         progress={progress}
         showResult={showResult}
+        onPositionUpdate={setBallPosition}
       />
-      
-      {/* Camera controlled by CameraController only */}
+
+      <TrajectoryLine
+        trajectory={pitch.trajectory}
+        progress={progress}
+        showResult={showResult}
+      />
+
+      <LandingIndicator
+        trajectory={pitch.trajectory}
+        showResult={showResult}
+      />
+
+      <CameraController
+        pitchProgress={progress}
+        isAnimating={isAnimating}
+        showResult={showResult}
+        ballPosition={ballPosition}
+      />
+
+      <Environment preset="sunset" />
     </Canvas>
   );
 }

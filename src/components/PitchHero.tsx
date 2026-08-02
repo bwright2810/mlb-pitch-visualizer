@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Pitch, PITCH_TYPES } from '@/types/pitch';
+import { getFlightTimeMs } from '@/lib/trajectory';
 import GripVisualization from './GripVisualization';
 
 // Constants for strike zone (must match Scene3D)
@@ -19,27 +20,28 @@ const PitchHero: React.FC = () => {
   const [showResult, setShowResult] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Animation logic
+  // Animation logic — uses real physics flight time
   const animatePitch = useCallback(() => {
     if (isAnimating) return;
-    
+
     // Reset if showing result
     setShowResult(false);
     setIsAnimating(true);
     setProgress(0);
-    
-    // Duration based on pitch velocity (faster pitch = shorter animation)
-    const avgVelocity = (selectedPitch.velocityRange[0] + selectedPitch.velocityRange[1]) / 2;
-    const duration = 2200 - (avgVelocity - 60) * 12; // ~2.2s at 60mph, ~1s at 100mph
-    
+
+    // Duration based on actual flight time from physics model
+    // Scale to a comfortable animation speed (real time × 1.8 for visibility)
+    const realFlightTimeMs = getFlightTimeMs(selectedPitch.trajectory);
+    const duration = realFlightTimeMs * 1.8; // Slightly slower than real-time for clarity
+
     const startTime = Date.now();
-    
+
     const animate = () => {
       const elapsed = Date.now() - startTime;
       const newProgress = Math.min(elapsed / duration, 1);
-      
+
       setProgress(newProgress);
-      
+
       if (newProgress < 1) {
         requestAnimationFrame(animate);
       } else {
@@ -48,7 +50,7 @@ const PitchHero: React.FC = () => {
         setTimeout(() => setShowResult(true), 200);
       }
     };
-    
+
     requestAnimationFrame(animate);
   }, [isAnimating, selectedPitch]);
 
@@ -83,16 +85,16 @@ const PitchHero: React.FC = () => {
     }
   };
 
-  // Calculate if pitch is a strike - must match StrikeZone component
+  // Calculate if pitch is a strike using target position at plate
   const isStrike = () => {
-    const x = selectedPitch.trajectory.horizontalBreak;
-    const y = selectedPitch.trajectory.verticalBreak + 2.5;
-    const zoneBottom = 1.5; // Must match StrikeZone component
+    const x = selectedPitch.trajectory.targetX;
+    const y = selectedPitch.trajectory.targetY;
+    const zoneBottom = 1.5;
     const zoneTop = zoneBottom + STRIKE_ZONE_HEIGHT;
-    
-    return Math.abs(x) < STRIKE_ZONE_WIDTH / 2 && 
-           y > zoneBottom && 
-           y < zoneTop;
+
+    return Math.abs(x) < STRIKE_ZONE_WIDTH / 2 &&
+      y > zoneBottom &&
+      y < zoneTop;
   };
 
   return (
@@ -104,7 +106,7 @@ const PitchHero: React.FC = () => {
             <span className="text-3xl">⚾</span>
             <h1 className="text-lg sm:text-xl font-bold">MLB Pitch Visualizer</h1>
           </div>
-          
+
           {/* Dark mode toggle */}
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
@@ -147,27 +149,27 @@ const PitchHero: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* 3D Visualizer */}
           <div className={`lg:col-span-2 rounded-2xl overflow-hidden shadow-2xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <div className="aspect-video sm:aspect-[4/3] lg:aspect-[16/10] relative">
-              <Scene3D 
-                pitch={selectedPitch} 
-                isAnimating={isAnimating} 
-                progress={progress} 
+            <div className="aspect-[9/16] sm:aspect-[3/4] lg:aspect-[9/14] relative">
+              <Scene3D
+                pitch={selectedPitch}
+                isAnimating={isAnimating}
+                progress={progress}
                 showResult={showResult}
               />
-              
+
               {/* Overlay controls */}
               <div className="absolute bottom-4 left-4 right-4">
                 {/* Result indicator */}
                 {showResult && (
                   <div className={`mb-3 p-3 rounded-lg text-center font-bold ${
-                    isStrike() 
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                    isStrike()
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                       : 'bg-red-500/20 text-red-400 border border-red-500/30'
                   }`}>
                     {isStrike() ? '✓ STRIKE' : '✗ BALL'}
                   </div>
                 )}
-                
+
                 <div className="flex gap-2">
                   <button
                     onClick={animatePitch}
@@ -190,7 +192,7 @@ const PitchHero: React.FC = () => {
                   )}
                 </div>
               </div>
-              
+
               {/* Pitch name overlay */}
               <div className="absolute top-4 left-4">
                 <h2 className="text-2xl sm:text-3xl font-bold drop-shadow-lg" style={{ color: selectedPitch.color }}>
@@ -200,12 +202,12 @@ const PitchHero: React.FC = () => {
                   {selectedPitch.difficulty.toUpperCase()}
                 </span>
               </div>
-              
+
               {/* Velocity indicator */}
               <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-mono ${isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'}`}>
                 {selectedPitch.velocity}
               </div>
-              
+
               {/* View mode indicator */}
               {showResult && (
                 <div className={`absolute top-20 right-4 px-2 py-1 rounded text-xs ${isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'}`}>
@@ -239,6 +241,22 @@ const PitchHero: React.FC = () => {
               </div>
             </div>
 
+            {/* Break Stats */}
+            <div className={`grid grid-cols-2 gap-3 ${isDarkMode ? 'text-white' : ''}`}>
+              <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
+                <div className={`text-lg font-bold ${selectedPitch.trajectory.inducedVerticalBreak >= 0 ? 'text-cyan-400' : 'text-orange-400'}`}>
+                  {selectedPitch.trajectory.inducedVerticalBreak > 0 ? '+' : ''}{selectedPitch.trajectory.inducedVerticalBreak}"
+                </div>
+                <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Induced Vert Break</div>
+              </div>
+              <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
+                <div className={`text-lg font-bold ${selectedPitch.trajectory.horizontalBreak >= 0 ? 'text-cyan-400' : 'text-orange-400'}`}>
+                  {selectedPitch.trajectory.horizontalBreak > 0 ? '+' : ''}{selectedPitch.trajectory.horizontalBreak}"
+                </div>
+                <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Horizontal Break</div>
+              </div>
+            </div>
+
             {/* Description */}
             <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
               <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : ''}`}>About This Pitch</h3>
@@ -247,13 +265,13 @@ const PitchHero: React.FC = () => {
               </p>
             </div>
 
-            {/* Grip Section - Always visible */}
+            {/* Grip Section */}
             <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
               <h3 className={`text-lg font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>🖐️ Grip & Release</h3>
               <GripVisualization pitch={selectedPitch} />
             </div>
 
-            {/* Extended Info - Always visible */}
+            {/* Extended Info */}
             <div className={`space-y-3 ${isDarkMode ? 'text-white' : ''}`}>
               <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
                 <h4 className="font-semibold text-gray-400 text-sm mb-1">When to Use</h4>
@@ -279,7 +297,7 @@ const PitchHero: React.FC = () => {
             Built with Next.js, React Three Fiber & Tailwind CSS
           </p>
           <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-600' : 'text-gray-500'}`}>
-            Interactive 3D pitch visualization with physics-based trajectories
+            Physics-based trajectories with gravity, drag & Magnus force
           </p>
         </div>
       </footer>

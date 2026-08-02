@@ -1,3 +1,21 @@
+// ============================================================
+// MLB Pitch Types - Statcast-Based Trajectory Data
+// ============================================================
+// All break values are from MLB Statcast measurements for RHP.
+//
+// Induced Vertical Break (IVB):
+//   - Positive = "rise" relative to no-spin trajectory
+//     (fastball backspin partially counteracts gravity)
+//   - Negative = extra drop beyond gravity
+//     (curveball topspin adds to gravity)
+//
+// Horizontal Break (HB):
+//   - Positive = arm-side movement (toward RHB for RHP)
+//   - Negative = glove-side movement (away from RHB for RHP)
+//
+// Note: All pitches assume a right-handed pitcher (RHP).
+// ============================================================
+
 export interface Pitch {
   id: string;
   name: string;
@@ -17,21 +35,29 @@ export interface Pitch {
   spinRateRange: [number, number]; // min, max rpm
   usage: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'very hard';
-  color: string; // for visualization
-  // 3D trajectory parameters (in feet, from pitcher's perspective)
+  color: string;
+
+  // Physics-based trajectory parameters
   trajectory: {
-    // Release point from center of rubber (feet)
-    releaseX: number; // horizontal offset (positive = arm side)
-    releaseY: number; // height
-    releaseZ: number; // distance from plate (60.5 ft is mound to plate)
-    // Break amounts (feet)
-    horizontalBreak: number; // positive = arm side, negative = glove side
-    verticalBreak: number; // positive = rise, negative = drop
-    // Trajectory shape
-    approachAngle: number; // degrees, negative = downward
-    spinAxis: number; // degrees from vertical (0 = top spin, 180 = backspin)
-    // Spin rate for animation
-    spinRateRpm?: number; // actual spin rate for ball rotation animation
+    // Release point (feet) - typical RHP release positions
+    releaseX: number;    // horizontal offset (negative = glove-side for RHP)
+    releaseY: number;    // height at release
+    releaseZ: number;    // distance from home plate (55 ft typical)
+
+    // Target location at plate (feet)
+    targetX: number;     // horizontal position at plate
+    targetY: number;     // height at plate
+
+    // Pitch characteristics
+    velocityMph: number; // typical release velocity for trajectory
+
+    // Statcast break values (inches)
+    inducedVerticalBreak: number; // + = "rise", - = extra drop
+    horizontalBreak: number;       // + = arm-side for RHP
+
+    // Spin for ball rotation animation
+    spinRateRpm: number;
+    spinAxis: number;     // degrees from vertical (for visual spin direction)
   };
 }
 
@@ -41,8 +67,8 @@ export const PITCH_TYPES: Pitch[] = [
     name: 'Four-Seam Fastball',
     velocity: '92-100+ mph',
     velocityRange: [92, 102],
-    movement: 'Ride & slight rise',
-    description: 'The most common fastball with pure backspin that creates lift, making it appear to rise as it approaches the plate. hitters often swing under it.',
+    movement: 'Ride & slight glove-side run',
+    description: 'The most common fastball with pure backspin that creates lift, making it appear to "rise" as it approaches the plate. Hitters often swing under it because it drops less than expected.',
     gripImage: '/grips/four-seam.png',
     gripDescription: 'Fingers across the horseshoe seam',
     gripDetails: {
@@ -57,14 +83,16 @@ export const PITCH_TYPES: Pitch[] = [
     difficulty: 'easy',
     color: '#ef4444',
     trajectory: {
-      releaseX: 0.5,
-      releaseY: 5.8,
-      releaseZ: 55,
-      horizontalBreak: -0.3,
-      verticalBreak: 0.5,
-      approachAngle: -1,
-      spinAxis: 180,
-      spinRateRpm: 2400
+      releaseX: -1.0,      // First-base side of rubber
+      releaseY: 5.8,       // 5'10" release height
+      releaseZ: 55,         // 55 ft from plate (pitcher's rubber at 60.5)
+      targetX: 0,           // Center of plate
+      targetY: 3.2,        // Upper zone (belt-high)
+      velocityMph: 96,
+      inducedVerticalBreak: 19,  // +19" = strong "rise" effect
+      horizontalBreak: -7,       // -7" = slight glove-side run
+      spinRateRpm: 2400,
+      spinAxis: 195          // Near-pure backspin
     }
   },
   {
@@ -88,14 +116,16 @@ export const PITCH_TYPES: Pitch[] = [
     difficulty: 'medium',
     color: '#f97316',
     trajectory: {
-      releaseX: 0.8,
+      releaseX: -1.2,       // More first-base side
       releaseY: 5.7,
       releaseZ: 55,
-      horizontalBreak: 1.2,
-      verticalBreak: -0.8,
-      approachAngle: -4,
-      spinAxis: 150,
-      spinRateRpm: 2200
+      targetX: 0.6,         // Inner half to RHB
+      targetY: 2.2,         // Lower zone
+      velocityMph: 94,
+      inducedVerticalBreak: 8,   // Less rise than 4-seam
+      horizontalBreak: 14,       // +14" = strong arm-side run
+      spinRateRpm: 2200,
+      spinAxis: 150          // Tilted axis for run
     }
   },
   {
@@ -119,14 +149,16 @@ export const PITCH_TYPES: Pitch[] = [
     difficulty: 'hard',
     color: '#22c55e',
     trajectory: {
-      releaseX: 0.4,
-      releaseY: 6.2,
+      releaseX: -0.8,
+      releaseY: 6.2,        // Higher release for arc
       releaseZ: 55,
-      horizontalBreak: -0.2,
-      verticalBreak: -2.8,
-      approachAngle: -12,
-      spinAxis: 15,
-      spinRateRpm: 2800
+      targetX: 0.3,         // Inner edge
+      targetY: 1.8,         // Low strike
+      velocityMph: 79,
+      inducedVerticalBreak: -10,  // -10" = extra drop beyond gravity
+      horizontalBreak: 8,         // +8" = arm-side sweep
+      spinRateRpm: 2800,
+      spinAxis: 15               // Near-topspin
     }
   },
   {
@@ -134,7 +166,7 @@ export const PITCH_TYPES: Pitch[] = [
     name: 'Slider',
     velocity: '82-90 mph',
     velocityRange: [82, 90],
-    movement: 'Late lateral break & drop',
+    movement: 'Late glove-side break & drop',
     description: 'Breaks down and away from same-handed batters with late, sharp movement. Looks like a fastball until it suddenly darts away.',
     gripImage: '/grips/slider.png',
     gripDescription: 'Off-center grip with pressure on the outer seam',
@@ -150,14 +182,16 @@ export const PITCH_TYPES: Pitch[] = [
     difficulty: 'medium',
     color: '#3b82f6',
     trajectory: {
-      releaseX: 0.3,
+      releaseX: -0.8,
       releaseY: 5.9,
       releaseZ: 55,
-      horizontalBreak: -0.8,
-      verticalBreak: -1.2,
-      approachAngle: -8,
-      spinAxis: 45,
-      spinRateRpm: 2700
+      targetX: -0.5,        // Outer edge to RHB
+      targetY: 2.0,        // Lower zone
+      velocityMph: 86,
+      inducedVerticalBreak: 4,    // Slight rise but less than FB
+      horizontalBreak: -9,        // -9" = glove-side sweep
+      spinRateRpm: 2700,
+      spinAxis: 45               // Diagonal spin axis
     }
   },
   {
@@ -181,14 +215,16 @@ export const PITCH_TYPES: Pitch[] = [
     difficulty: 'medium',
     color: '#a855f7',
     trajectory: {
-      releaseX: 0.6,
+      releaseX: -1.0,
       releaseY: 5.8,
       releaseZ: 55,
-      horizontalBreak: 0.8,
-      verticalBreak: -1.0,
-      approachAngle: -6,
-      spinAxis: 135,
-      spinRateRpm: 1900
+      targetX: 0.5,         // Inner half
+      targetY: 2.0,         // Lower zone
+      velocityMph: 85,
+      inducedVerticalBreak: 7,    // Some fade
+      horizontalBreak: 13,        // +13" = arm-side fade
+      spinRateRpm: 1900,
+      spinAxis: 135              // Tilted backspin
     }
   },
   {
@@ -212,14 +248,16 @@ export const PITCH_TYPES: Pitch[] = [
     difficulty: 'hard',
     color: '#ec4899',
     trajectory: {
-      releaseX: 0.4,
+      releaseX: -0.8,
       releaseY: 5.9,
       releaseZ: 55,
-      horizontalBreak: -0.6,
-      verticalBreak: -0.3,
-      approachAngle: -3,
-      spinAxis: 165,
-      spinRateRpm: 2500
+      targetX: -0.2,        // Outer edge
+      targetY: 2.8,        // Middle zone
+      velocityMph: 91,
+      inducedVerticalBreak: 6,    // Some rise
+      horizontalBreak: -5,         // -5" = glove-side cut
+      spinRateRpm: 2500,
+      spinAxis: 170              // Slightly tilted backspin
     }
   },
   {
@@ -243,14 +281,16 @@ export const PITCH_TYPES: Pitch[] = [
     difficulty: 'hard',
     color: '#14b8a6',
     trajectory: {
-      releaseX: 0.5,
+      releaseX: -0.8,
       releaseY: 6.0,
       releaseZ: 55,
-      horizontalBreak: 0.2,
-      verticalBreak: -2.2,
-      approachAngle: -14,
-      spinAxis: 30,
-      spinRateRpm: 1500
+      targetX: 0.2,
+      targetY: 1.2,        // Below zone - bury it
+      velocityMph: 86,
+      inducedVerticalBreak: -5,   // -5" = extra drop
+      horizontalBreak: 3,         // Slight arm-side
+      spinRateRpm: 1500,
+      spinAxis: 30                // Some topspin
     }
   },
   {
@@ -274,14 +314,16 @@ export const PITCH_TYPES: Pitch[] = [
     difficulty: 'very hard',
     color: '#eab308',
     trajectory: {
-      releaseX: 0.5,
+      releaseX: -0.8,
       releaseY: 5.8,
       releaseZ: 55,
-      horizontalBreak: 0, // unpredictable
-      verticalBreak: -0.5,
-      approachAngle: -5,
-      spinAxis: 90,
-      spinRateRpm: 300
+      targetX: 0.1,
+      targetY: 2.5,        // Middle zone
+      velocityMph: 66,
+      inducedVerticalBreak: -2,   // Minimal magnus effect
+      horizontalBreak: 1,          // Slight movement
+      spinRateRpm: 300,
+      spinAxis: 90                 // Random axis
     }
   }
 ];

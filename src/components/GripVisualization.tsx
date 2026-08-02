@@ -109,164 +109,174 @@ const GripVisualization: React.FC<GripVisualizationProps> = ({ pitch }) => {
     }
   };
 
-  // Draw baseball seams based on grip type
+  // Draw baseball seams based on grip type - accurate baseball seam pattern
   const renderSeams = () => {
     const { center, ballRadius, seamColor } = config;
     
+    // Real baseball seams: two curved arcs on opposite sides
+    // Each arc has two parallel curved lines representing the actual stitches
+    
     switch (config.seams) {
       case 'horseshoe':
+        // Standard baseball seam view - two curved C-shapes
         return (
           <>
-            {/* Left horseshoe */}
+            {/* Left seam arc - curves from top-left around left side to bottom-left */}
             <path
-              d={`M ${center.x - 25} ${center.y - 30} 
-                  Q ${center.x - 45} ${center.y - 10} ${center.x - 40} ${center.y + 20}
-                  Q ${center.x - 35} ${center.y + 50} ${center.x - 15} ${center.y + 60}`}
+              d={`M ${center.x - 20} ${center.y - ballRadius + 15}
+                  Q ${center.x - ballRadius + 5} ${center.y - 40} ${center.x - ballRadius + 10} ${center.y}
+                  Q ${center.x - ballRadius + 5} ${center.y + 40} ${center.x - 20} ${center.y + ballRadius - 15}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
             <path
-              d={`M ${center.x - 20} ${center.y - 35} 
-                  Q ${center.x - 42} ${center.y - 15} ${center.x - 38} ${center.y + 15}
-                  Q ${center.x - 34} ${center.y + 45} ${center.x - 12} ${center.y + 55}`}
+              d={`M ${center.x - 15} ${center.y - ballRadius + 10}
+                  Q ${center.x - ballRadius + 10} ${center.y - 35} ${center.x - ballRadius + 15} ${center.y}
+                  Q ${center.x - ballRadius + 10} ${center.y + 35} ${center.x - 15} ${center.y + ballRadius - 10}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
-            {/* Right horseshoe */}
+            {/* Right seam arc - curves from top-right around right side to bottom-right */}
             <path
-              d={`M ${center.x + 25} ${center.y - 30} 
-                  Q ${center.x + 45} ${center.y - 10} ${center.x + 40} ${center.y + 20}
-                  Q ${center.x + 35} ${center.y + 50} ${center.x + 15} ${center.y + 60}`}
+              d={`M ${center.x + 20} ${center.y - ballRadius + 15}
+                  Q ${center.x + ballRadius - 5} ${center.y - 40} ${center.x + ballRadius - 10} ${center.y}
+                  Q ${center.x + ballRadius - 5} ${center.y + 40} ${center.x + 20} ${center.y + ballRadius - 15}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
             <path
-              d={`M ${center.x + 20} ${center.y - 35} 
-                  Q ${center.x + 42} ${center.y - 15} ${center.x + 38} ${center.y + 15}
-                  Q ${center.x + 34} ${center.y + 45} ${center.x + 12} ${center.y + 55}`}
+              d={`M ${center.x + 15} ${center.y - ballRadius + 10}
+                  Q ${center.x + ballRadius - 10} ${center.y - 35} ${center.x + ballRadius - 15} ${center.y}
+                  Q ${center.x + ballRadius - 10} ${center.y + 35} ${center.x + 15} ${center.y + ballRadius - 10}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
           </>
         );
       case 'narrow':
+        // 2-seam fastball view - seams run vertically on sides
         return (
           <>
-            {/* Narrow seams (for 2-seam) */}
+            {/* Left narrow seam - vertical curve on left side */}
             <path
-              d={`M ${center.x - 55} ${center.y - 40}
-                  Q ${center.x - 35} ${center.y} ${center.x - 55} ${center.y + 40}`}
+              d={`M ${center.x - ballRadius + 20} ${center.y - ballRadius + 25}
+                  Q ${center.x - ballRadius + 5} ${center.y} ${center.x - ballRadius + 20} ${center.y + ballRadius - 25}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
             <path
-              d={`M ${center.x - 50} ${center.y - 45}
-                  Q ${center.x - 30} ${center.y} ${center.x - 50} ${center.y + 45}`}
+              d={`M ${center.x - ballRadius + 15} ${center.y - ballRadius + 30}
+                  Q ${center.x - ballRadius + 10} ${center.y} ${center.x - ballRadius + 15} ${center.y + ballRadius - 30}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            {/* Right narrow seam - vertical curve on right side */}
+            <path
+              d={`M ${center.x + ballRadius - 20} ${center.y - ballRadius + 25}
+                  Q ${center.x + ballRadius - 5} ${center.y} ${center.x + ballRadius - 20} ${center.y + ballRadius - 25}`}
+              fill="none"
+              stroke={seamColor}
+              strokeWidth="3"
               strokeLinecap="round"
             />
             <path
-              d={`M ${center.x + 55} ${center.y - 40}
-                  Q ${center.x + 35} ${center.y} ${center.x + 55} ${center.y + 40}`}
+              d={`M ${center.x + ballRadius - 15} ${center.y - ballRadius + 30}
+                  Q ${center.x + ballRadius - 10} ${center.y} ${center.x + ballRadius - 15} ${center.y + ballRadius - 30}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
-            <path
-              d={`M ${center.x + 50} ${center.y - 45}
-                  Q ${center.x + 30} ${center.y} ${center.x + 50} ${center.y + 45}`}
-              fill="none"
-              stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
           </>
         );
       case 'cross':
+        // Cross seams - diagonal curves crossing the ball
         return (
           <>
-            {/* Cross seams */}
+            {/* Upper-left to lower-right seam */}
             <path
-              d={`M ${center.x - 60} ${center.y - 20}
-                  Q ${center.x - 20} ${center.y - 50} ${center.x + 20} ${center.y - 60}`}
+              d={`M ${center.x - ballRadius + 25} ${center.y - ballRadius + 30}
+                  Q ${center.x - 20} ${center.y} ${center.x - ballRadius + 25} ${center.y + ballRadius - 30}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
             <path
-              d={`M ${center.x - 55} ${center.y - 15}
-                  Q ${center.x - 15} ${center.y - 45} ${center.x + 25} ${center.y - 55}`}
+              d={`M ${center.x - ballRadius + 20} ${center.y - ballRadius + 25}
+                  Q ${center.x - 25} ${center.y} ${center.x - ballRadius + 20} ${center.y + ballRadius - 25}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            {/* Upper-right to lower-left seam */}
+            <path
+              d={`M ${center.x + ballRadius - 25} ${center.y - ballRadius + 30}
+                  Q ${center.x + 20} ${center.y} ${center.x + ballRadius - 25} ${center.y + ballRadius - 30}`}
+              fill="none"
+              stroke={seamColor}
+              strokeWidth="3"
               strokeLinecap="round"
             />
             <path
-              d={`M ${center.x - 60} ${center.y + 20}
-                  Q ${center.x - 20} ${center.y + 50} ${center.x + 20} ${center.y + 60}`}
+              d={`M ${center.x + ballRadius - 20} ${center.y - ballRadius + 25}
+                  Q ${center.x + 25} ${center.y} ${center.x + ballRadius - 20} ${center.y + ballRadius - 25}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
-            <path
-              d={`M ${center.x - 55} ${center.y + 15}
-                  Q ${center.x - 15} ${center.y + 45} ${center.x + 25} ${center.y + 55}`}
-              fill="none"
-              stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
           </>
         );
       case 'split':
+        // Splitter grip - seams wide apart, showing middle of ball
         return (
           <>
-            {/* Split seams - wide apart */}
+            {/* Left seam - pushed to far left */}
             <path
-              d={`M ${center.x - 65} ${center.y - 30}
-                  Q ${center.x - 50} ${center.y} ${center.x - 65} ${center.y + 30}`}
+              d={`M ${center.x - 35} ${center.y - ballRadius + 20}
+                  Q ${center.x - ballRadius + 5} ${center.y} ${center.x - 35} ${center.y + ballRadius - 20}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
             <path
-              d={`M ${center.x - 60} ${center.y - 35}
-                  Q ${center.x - 45} ${center.y} ${center.x - 60} ${center.y + 35}`}
+              d={`M ${center.x - 30} ${center.y - ballRadius + 15}
+                  Q ${center.x - ballRadius + 10} ${center.y} ${center.x - 30} ${center.y + ballRadius - 15}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            {/* Right seam - pushed to far right */}
+            <path
+              d={`M ${center.x + 35} ${center.y - ballRadius + 20}
+                  Q ${center.x + ballRadius - 5} ${center.y} ${center.x + 35} ${center.y + ballRadius - 20}`}
+              fill="none"
+              stroke={seamColor}
+              strokeWidth="3"
               strokeLinecap="round"
             />
             <path
-              d={`M ${center.x + 65} ${center.y - 30}
-                  Q ${center.x + 50} ${center.y} ${center.x + 65} ${center.y + 30}`}
+              d={`M ${center.x + 30} ${center.y - ballRadius + 15}
+                  Q ${center.x + ballRadius - 10} ${center.y} ${center.x + 30} ${center.y + ballRadius - 15}`}
               fill="none"
               stroke={seamColor}
-              strokeWidth="4"
-              strokeLinecap="round"
-            />
-            <path
-              d={`M ${center.x + 60} ${center.y - 35}
-                  Q ${center.x + 45} ${center.y} ${center.x + 60} ${center.y + 35}`}
-              fill="none"
-              stroke={seamColor}
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
             />
           </>
