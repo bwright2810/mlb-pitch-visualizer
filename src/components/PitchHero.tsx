@@ -5,6 +5,10 @@ import dynamic from 'next/dynamic';
 import { Pitch, PITCH_TYPES } from '@/types/pitch';
 import GripVisualization from './GripVisualization';
 
+// Constants for strike zone (must match Scene3D)
+const STRIKE_ZONE_WIDTH = 1.42; // 17 inches
+const STRIKE_ZONE_HEIGHT = 1.84; // 22 inches
+
 // Dynamic import for 3D scene to avoid SSR issues
 const Scene3D = dynamic(() => import('./Scene3D'), { ssr: false });
 
@@ -79,17 +83,16 @@ const PitchHero: React.FC = () => {
     }
   };
 
-  // Calculate if pitch is a strike
+  // Calculate if pitch is a strike - must match StrikeZone component
   const isStrike = () => {
     const x = selectedPitch.trajectory.horizontalBreak;
     const y = selectedPitch.trajectory.verticalBreak + 2.5;
-    const zoneWidth = 1.42;
-    const zoneHeight = 1.84;
-    const zoneCenter = 2.4;
+    const zoneBottom = 1.5; // Must match StrikeZone component
+    const zoneTop = zoneBottom + STRIKE_ZONE_HEIGHT;
     
-    return Math.abs(x) < zoneWidth / 2 && 
-           y > zoneCenter - zoneHeight / 2 && 
-           y < zoneCenter + zoneHeight / 2;
+    return Math.abs(x) < STRIKE_ZONE_WIDTH / 2 && 
+           y > zoneBottom && 
+           y < zoneTop;
   };
 
   return (

@@ -20,14 +20,14 @@ interface BaseballProps {
   onPositionUpdate?: (pos: THREE.Vector3) => void;
 }
 
-// Create a baseball with proper seam geometry
+// Create a baseball with proper seam geometry - larger scale for visibility
 function BaseballMesh({ position }: { position: [number, number, number] }) {
   return (
-    <group position={position} scale={1.5}>
+    <group position={position} scale={2.5}>
       {/* Main ball - white leather */}
       <mesh castShadow>
         <sphereGeometry args={[0.15, 32, 32]} />
-        <meshStandardMaterial color="#f8f8f8" roughness={0.4} />
+        <meshStandardMaterial color="#f8f8f8" roughness={0.4} emissive="#ffffff" emissiveIntensity={0.15} />
       </mesh>
       
       {/* Red seams using torus geometry - figure-8 pattern */}
@@ -72,7 +72,8 @@ function calculateBallPosition(
   const x = trajectory.releaseX * (1 - t) + trajectory.horizontalBreak * breakMultiplier;
   const y = trajectory.releaseY * (1 - t) + trajectory.verticalBreak * breakMultiplier + 2.5;
   
-  return new THREE.Vector3(x, Math.max(0.3, y), z);
+  // Always ensure ball is above ground
+  return new THREE.Vector3(x, Math.max(0.5, y), z);
 }
 
 function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpdate }: BaseballProps) {
@@ -91,16 +92,14 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
     }
   }, [currentPos, onPositionUpdate]);
 
-  // Rotation speed - very slow for visual clarity (like slow-mo replay)
+  // Rotation speed - spin faster during animation for visual effect
   useEffect(() => {
-    // Gentle spin during animation, almost none when static
-    setRotationSpeed(isAnimating ? 0.5 : 0.05);
+    setRotationSpeed(isAnimating ? 8 : 0.05); // Much faster spin during pitch
   }, [isAnimating]);
 
-  // Spin the ball gently
+  // Spin the ball
   useFrame((_, delta) => {
     if (groupRef.current) {
-      // Very slow rotation - radians per second, not RPM-based
       groupRef.current.rotation.x += rotationSpeed * delta;
       groupRef.current.rotation.z += rotationSpeed * delta * 0.5;
     }
@@ -109,6 +108,13 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
   return (
     <group ref={groupRef}>
       <BaseballMesh position={[currentPos.x, currentPos.y, currentPos.z]} />
+      {/* Glow effect during animation */}
+      {isAnimating && (
+        <mesh position={[currentPos.x, currentPos.y, currentPos.z]}>
+          <sphereGeometry args={[0.5, 16, 16]} />
+          <meshBasicMaterial color="#93c5fd" transparent opacity={0.15} />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -286,7 +292,7 @@ function Pitcher({ pitchProgress, isAnimating }: { pitchProgress: number; isAnim
   );
 }
 
-// Landing indicator in strike zone
+// Landing indicator in strike zone - positioned at home plate
 function LandingIndicator({ 
   trajectory, 
   showResult 
@@ -298,34 +304,25 @@ function LandingIndicator({
 
   const x = trajectory.horizontalBreak;
   const y = trajectory.verticalBreak + 2.5;
-  const zoneCenter = 2.4;
+  const zoneBottom = 1.5;
+  const zoneCenter = zoneBottom + STRIKE_ZONE_HEIGHT / 2;
 
   const isInZone = Math.abs(x) < STRIKE_ZONE_WIDTH / 2 && 
-                   y > zoneCenter - STRIKE_ZONE_HEIGHT / 2 && 
-                   y < zoneCenter + STRIKE_ZONE_HEIGHT / 2;
+                   y > zoneBottom && 
+                   y < zoneBottom + STRIKE_ZONE_HEIGHT;
 
   return (
-    <group position={[x, y, 0.1]}>
+    <group position={[x, y, 0.5]}>
       {/* Impact circle */}
       <mesh>
-        <ringGeometry args={[0.1, 0.15, 32]} />
+        <ringGeometry args={[0.08, 0.12, 32]} />
         <meshBasicMaterial color={isInZone ? "#22c55e" : "#ef4444"} side={THREE.DoubleSide} />
       </mesh>
       {/* Center dot */}
       <mesh>
-        <circleGeometry args={[0.05, 16]} />
+        <circleGeometry args={[0.04, 16]} />
         <meshBasicMaterial color={isInZone ? "#22c55e" : "#ef4444"} side={THREE.DoubleSide} />
       </mesh>
-      {/* Label */}
-      <Text
-        position={[0, 0.4, 0]}
-        fontSize={0.2}
-        color={isInZone ? "#22c55e" : "#ef4444"}
-        anchorX="center"
-        anchorY="middle"
-      >
-        {isInZone ? "STRIKE" : "BALL"}
-      </Text>
     </group>
   );
 }
@@ -371,14 +368,15 @@ function StrikeZone() {
   const zoneCenter = zoneBottom + STRIKE_ZONE_HEIGHT / 2;
 
   return (
-    <group position={[0, zoneCenter, 0]}>
+    <group position={[0, zoneCenter, 0.5]}>
       {/* Transparent strike zone box */}
       <mesh>
         <boxGeometry args={[STRIKE_ZONE_WIDTH, STRIKE_ZONE_HEIGHT, 0.02]} />
-        <meshStandardMaterial color="#3b82f6" transparent opacity={0.1} />
+        <meshStandardMaterial color="#3b82f6" transparent opacity={0.15} />
       </mesh>
       
-      {/* Zone outline - top */}
+      {/* Zone outline - all 4 edges */}
+      {/* Top */}
       <Line
         points={[
           [-STRIKE_ZONE_WIDTH/2, STRIKE_ZONE_HEIGHT/2, 0],
@@ -413,6 +411,28 @@ function StrikeZone() {
         ]}
         color="#60a5fa"
         lineWidth={2}
+      />
+      
+      {/* Cross lines for visual reference */}
+      <Line
+        points={[
+          [-STRIKE_ZONE_WIDTH/2, 0, 0],
+          [STRIKE_ZONE_WIDTH/2, 0, 0],
+        ]}
+        color="#60a5fa"
+        lineWidth={1}
+        transparent
+        opacity={0.5}
+      />
+      <Line
+        points={[
+          [0, -STRIKE_ZONE_HEIGHT/2, 0],
+          [0, STRIKE_ZONE_HEIGHT/2, 0],
+        ]}
+        color="#60a5fa"
+        lineWidth={1}
+        transparent
+        opacity={0.5}
       />
     </group>
   );
@@ -449,44 +469,52 @@ function CameraController({
 }) {
   const { camera } = useThree();
   const targetPosition = useRef(new THREE.Vector3(3, 8, MOUND_TO_PLATE + 5));
+  const targetLookAt = useRef(new THREE.Vector3(0, 4, MOUND_TO_PLATE / 2));
   
   // Initial view position (behind and to the side of pitcher)
   const initialPos = new THREE.Vector3(3, 8, MOUND_TO_PLATE + 5);
+  const initialLookAt = new THREE.Vector3(0, 4, MOUND_TO_PLATE / 2);
   
   // Side view position for result
-  const sideViewPos = new THREE.Vector3(30, 8, 20);
-  
-  // Home plate view
-  const homePlatePos = new THREE.Vector3(5, 5, -8);
+  const sideViewPos = new THREE.Vector3(15, 5, 20);
+  const sideViewLookAt = new THREE.Vector3(0, 2.5, 5);
 
   useFrame(() => {
     if (isAnimating) {
-      // Camera follows ball trajectory smoothly
-      const pitcherZ = MOUND_TO_PLATE - 1;
+      // Camera follows ball with gentle tracking - stay behind pitcher area
+      // but smoothly pan to keep the ball in view
       const t = pitchProgress;
       
-      // Camera moves from behind pitcher towards home plate
-      const camZ = (pitcherZ + 5) * (1 - t * 0.6) + (-5) * t * 0.6;
-      const camX = 3 - t * 2;
-      const camY = 8 - t * 3;
+      // Keep camera mostly in place with subtle movement toward home plate
+      // Avoid extreme camera positions that cause blank renders
+      const camZ = MOUND_TO_PLATE + 5 - t * 10; // Subtle forward drift, never goes negative
+      const camX = 3 - t * 1.5; // Subtle horizontal shift
+      const camY = 8 - t * 2; // Subtle height decrease, stays well above field
       
-      targetPosition.current.set(camX, camY, camZ);
+      targetPosition.current.set(camX, Math.max(camY, 4), Math.max(camZ, 10));
       
-      // Smoothly look towards ball position
-      const lookTarget = new THREE.Vector3(
-        ballPosition.x * 0.3,
-        ballPosition.y + 1,
-        ballPosition.z
+      // Look at a point between ball and home plate area
+      const lookX = ballPosition.x * 0.2;
+      const lookY = Math.max(ballPosition.y * 0.5 + 2, 2);
+      const lookZ = ballPosition.z * 0.5 + 5;
+      targetLookAt.current.set(lookX, lookY, lookZ);
+      
+      // Smoothly interpolate look target
+      camera.lookAt(
+        THREE.MathUtils.lerp(camera.position.x + (targetLookAt.current.x - camera.position.x) * 0.1, targetLookAt.current.x, 0.05),
+        THREE.MathUtils.lerp(camera.position.y + (targetLookAt.current.y - camera.position.y) * 0.1, targetLookAt.current.y, 0.05),
+        THREE.MathUtils.lerp(camera.position.z + (targetLookAt.current.z - camera.position.z) * 0.1, targetLookAt.current.z, 0.05)
       );
-      camera.lookAt(lookTarget);
     } else if (showResult) {
       // Smooth transition to side view
       targetPosition.current.lerp(sideViewPos, 0.03);
-      camera.lookAt(0, 2.5, 5);
+      targetLookAt.current.lerp(sideViewLookAt, 0.05);
+      camera.lookAt(targetLookAt.current);
     } else {
       // Return to initial view
       targetPosition.current.lerp(initialPos, 0.03);
-      camera.lookAt(0, 4, MOUND_TO_PLATE / 2);
+      targetLookAt.current.lerp(initialLookAt, 0.05);
+      camera.lookAt(targetLookAt.current);
     }
     
     // Smooth camera movement
