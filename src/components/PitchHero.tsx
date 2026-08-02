@@ -151,7 +151,7 @@ const PitchHero: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* 3D Visualizer */}
           <div className={`lg:col-span-2 rounded-2xl overflow-hidden shadow-2xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <div className="aspect-[9/16] sm:aspect-[3/4] lg:aspect-[9/14] relative">
+            <div className="aspect-[2/1] sm:aspect-[15/14] lg:aspect-[45/49] relative">
               <Scene3D
                 pitch={selectedPitch}
                 isAnimating={isAnimating}
@@ -223,6 +223,13 @@ const PitchHero: React.FC = () => {
               {/* Velocity indicator */}
               <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-mono ${isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'}`}>
                 {selectedPitch.velocity}
+              </div>
+
+              {/* Mobile scroll hint - appears after animation on mobile */}
+              <div className={`absolute bottom-20 left-1/2 -translate-x-1/2 transition-opacity duration-500 sm:hidden pointer-events-none ${showResult && !isAnimating ? 'opacity-100' : 'opacity-0'}`}>
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs animate-bounce ${isDarkMode ? 'bg-gray-800/70 text-gray-300' : 'bg-white/70 text-gray-600'}`}>
+                  <span>↕</span> Scroll for details
+                </div>
               </div>
             </div>
           </div>

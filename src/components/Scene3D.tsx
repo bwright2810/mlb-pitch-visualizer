@@ -313,13 +313,18 @@ function CameraController({
   return null;
 }
 
-function SideViewControls({ enabled }: { enabled: boolean }) {
+function SideViewControls({ enabled, touches }: { enabled: boolean; touches: boolean }) {
   return (
     <OrbitControls
       enabled={enabled}
       enablePan={true}
       enableZoom={true}
       enableRotate={true}
+      touches={
+        touches
+          ? { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
+          : { ONE: 0 as any, TWO: 0 as any }
+      }
       minDistance={50}
       maxDistance={300}
       target={[0, 2.5, 0]}
@@ -348,7 +353,7 @@ export default function Scene3D({
     <Canvas
       shadows
       camera={{ position: [2, 6.5, 63], fov: 50 }}
-      style={{ background: '#0a0a0a' }}
+      style={{ background: '#0a0a0a', touchAction: enableOrbitControls ? 'none' : 'pan-y' }}
     >
       <ambientLight intensity={0.4} />
       <directionalLight position={[10, 20, 10]} intensity={1} castShadow shadow-mapSize={[2048, 2048]} />
@@ -377,7 +382,7 @@ export default function Scene3D({
         ballPosition={ballPosition}
       />
 
-      <SideViewControls enabled={enableOrbitControls} />
+      <SideViewControls enabled={enableOrbitControls} touches={enableOrbitControls} />
 
       <Environment preset="sunset" />
     </Canvas>
