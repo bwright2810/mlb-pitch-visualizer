@@ -314,12 +314,57 @@ function CameraController({
 }
 
 function SideViewControls({ enabled }: { enabled: boolean }) {
+  const controlsRef = useRef<any>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [rotationY, setRotationY] = useState(0);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.button === 0) {
+        setIsDragging(true);
+        setStartX(e.clientX);
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!isDragging || !controlsRef.current) return;
+      const deltaX = e.clientX - startX;
+      const newRotation = rotationY + deltaX * 0.005;
+      setRotationY(newRotation);
+      
+      // Update camera position around the target
+      const radius = 120;
+      const x = Math.sin(newRotation) * radius;
+      const z = Math.cos(newRotation) * radius;
+      controlsRef.current.object.position.set(x, 20, z);
+      controlsRef.current.update();
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [enabled, isDragging, startX, rotationY]);
+
   return (
     <OrbitControls
+      ref={controlsRef}
       enabled={enabled}
       enablePan={true}
       enableZoom={true}
-      enableRotate={true}
+      enableRotate={false}
       minDistance={50}
       maxDistance={300}
       target={[0, 2.5, 0]}
