@@ -13,17 +13,17 @@ const STRIKE_ZONE_HEIGHT = 1.84; // 22 inches
 const MOUND_HEIGHT = 0.61; // 10 inches
 
 interface BaseballProps {
-  position: [number, number, number];
   trajectory: Pitch['trajectory'];
   isAnimating: boolean;
   progress: number;
   showResult: boolean;
+  onPositionUpdate?: (pos: THREE.Vector3) => void;
 }
 
 // Create a baseball with seams texture
 function BaseballMesh({ position }: { position: [number, number, number] }) {
   return (
-    <group position={position} scale={1.2}>
+    <group position={position} scale={1.5}>
       {/* Main ball - white leather */}
       <mesh castShadow>
         <sphereGeometry args={[0.15, 32, 32]} />
@@ -90,36 +90,50 @@ function BaseballMesh({ position }: { position: [number, number, number] }) {
   );
 }
 
-function Baseball({ position, trajectory, isAnimating, progress, showResult }: BaseballProps) {
+// Calculate ball trajectory position (shared logic)
+function calculateBallPosition(
+  trajectory: Pitch['trajectory'], 
+  progress: number, 
+  showResult: boolean
+): THREE.Vector3 {
+  const pitcherZ = MOUND_TO_PLATE - 1;
+  const releaseZ = pitcherZ - 2; // Ball released 2 feet in front of pitcher
+  
+  if (showResult) {
+    // Final position at home plate
+    const x = trajectory.horizontalBreak;
+    const y = trajectory.verticalBreak + 2.5;
+    return new THREE.Vector3(x, Math.max(0.5, y), 0.5);
+  }
+  
+  const t = progress;
+  
+  // Interpolate from release point to home plate
+  const z = releaseZ * (1 - t) + 0.5 * t;
+  
+  // Apply break - movement increases as ball gets closer (late break)
+  const breakMultiplier = Math.pow(t, 1.5);
+  const x = trajectory.releaseX * (1 - t) + trajectory.horizontalBreak * breakMultiplier;
+  const y = trajectory.releaseY * (1 - t) + trajectory.verticalBreak * breakMultiplier + 2.5;
+  
+  return new THREE.Vector3(x, Math.max(0.3, y), z);
+}
+
+function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpdate }: BaseballProps) {
   const groupRef = useRef<THREE.Group>(null);
   const [rotationSpeed, setRotationSpeed] = useState(0.1);
 
-  // Calculate final position (where ball ends up)
-  const finalPos = useMemo(() => {
-    const endZ = 0.5; // Near home plate
-    const breakMultiplier = 1; // Full break at end
-    const x = trajectory.releaseX * 0 + trajectory.horizontalBreak * breakMultiplier;
-    const y = trajectory.releaseY * 0 + trajectory.verticalBreak * breakMultiplier + 2.5;
-    return new THREE.Vector3(x, Math.max(0.5, y), endZ);
-  }, [trajectory]);
-
-  // Calculate position along trajectory
+  // Calculate current position
   const currentPos = useMemo(() => {
-    if (showResult) return finalPos;
-    
-    const t = progress;
-    const startZ = trajectory.releaseZ;
-    
-    // Linear interpolation for distance
-    const z = startZ * (1 - t) + 0.5 * t;
-    
-    // Apply break - movement increases as ball gets closer (late break)
-    const breakMultiplier = Math.pow(t, 1.5);
-    const x = trajectory.releaseX * (1 - t) + trajectory.horizontalBreak * breakMultiplier;
-    const y = trajectory.releaseY * (1 - t) + trajectory.verticalBreak * breakMultiplier + 2.5;
-    
-    return new THREE.Vector3(x, Math.max(0.3, y), z);
-  }, [progress, trajectory, showResult, finalPos]);
+    return calculateBallPosition(trajectory, progress, showResult);
+  }, [progress, trajectory, showResult]);
+
+  // Update parent with ball position
+  useEffect(() => {
+    if (onPositionUpdate) {
+      onPositionUpdate(currentPos);
+    }
+  }, [currentPos, onPositionUpdate]);
 
   // Rotation speed based on spin rate
   useEffect(() => {
@@ -158,14 +172,8 @@ function TrajectoryLine({
     
     for (let i = 0; i < numPoints; i++) {
       const t = showResult ? i / 99 : (i / 100) * progress;
-      const startZ = trajectory.releaseZ;
-      
-      const z = startZ * (1 - t) + 0.5 * t;
-      const breakMultiplier = Math.pow(t, 1.5);
-      const x = trajectory.releaseX * (1 - t) + trajectory.horizontalBreak * breakMultiplier;
-      const y = trajectory.releaseY * (1 - t) + trajectory.verticalBreak * breakMultiplier + 2.5;
-      
-      linePoints.push(new THREE.Vector3(x, Math.max(0.3, y), z));
+      const pos = calculateBallPosition(trajectory, t, false);
+      linePoints.push(pos);
     }
     
     return linePoints;
@@ -181,6 +189,143 @@ function TrajectoryLine({
       opacity={0.8}
       transparent
     />
+  );
+}
+
+// Generic Pitcher model
+function Pitcher({ pitchProgress, isAnimating }: { pitchProgress: number; isAnimating: boolean }) {
+  const groupRef = useRef<THREE.Group>(null);
+  const armRef = useRef<THREE.Group>(null);
+  const frontLegRef = useRef<THREE.Group>(null);
+  
+  // Pitcher position on mound
+  const pitcherZ = MOUND_TO_PLATE - 1;
+  
+  useFrame(() => {
+    if (!groupRef.current) return;
+    
+    if (isAnimating && pitchProgress < 0.3) {
+      // Wind-up phase - leg lift and arm back
+      const phase = pitchProgress / 0.3;
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(0, -0.4, phase);
+      if (frontLegRef.current) {
+        frontLegRef.current.rotation.x = THREE.MathUtils.lerp(0, -0.8, phase);
+      }
+      if (armRef.current) {
+        armRef.current.rotation.x = THREE.MathUtils.lerp(0, -1.2, phase);
+      }
+    } else if (isAnimating && pitchProgress >= 0.3 && pitchProgress < 0.5) {
+      // Throw phase - arm comes forward rapidly
+      const phase = (pitchProgress - 0.3) / 0.2;
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(-0.4, 0.3, phase);
+      if (frontLegRef.current) {
+        frontLegRef.current.rotation.x = THREE.MathUtils.lerp(-0.8, 0, phase);
+      }
+      if (armRef.current) {
+        armRef.current.rotation.x = THREE.MathUtils.lerp(-1.2, 1.0, phase);
+      }
+    } else if (isAnimating && pitchProgress >= 0.5) {
+      // Follow through
+      const phase = Math.min((pitchProgress - 0.5) / 0.3, 1);
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(0.3, 0.1, phase);
+      if (armRef.current) {
+        armRef.current.rotation.x = THREE.MathUtils.lerp(1.0, 0.5, phase);
+      }
+    } else {
+      // Reset to ready position
+      groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, 0, 0.05);
+      if (frontLegRef.current) {
+        frontLegRef.current.rotation.x = THREE.MathUtils.lerp(frontLegRef.current.rotation.x, 0, 0.05);
+      }
+      if (armRef.current) {
+        armRef.current.rotation.x = THREE.MathUtils.lerp(armRef.current.rotation.x, 0, 0.05);
+      }
+    }
+  });
+  
+  return (
+    <group ref={groupRef} position={[0, 0, pitcherZ]}>
+      {/* Body/Torso - jersey */}
+      <mesh position={[0, 3.5, 0]} castShadow>
+        <capsuleGeometry args={[0.35, 1.2, 8, 16]} />
+n        <meshStandardMaterial color="#1e3a5f" roughness={0.7} />
+      </mesh>
+      
+      {/* Head */}
+      <mesh position={[0, 4.8, 0]} castShadow>
+        <sphereGeometry args={[0.35, 16, 16]} />
+        <meshStandardMaterial color="#d4a574" roughness={0.6} />
+      </mesh>
+      
+      {/* Cap */}
+      <mesh position={[0, 5.15, 0]} castShadow>
+        <cylinderGeometry args={[0.38, 0.42, 0.2, 16]} />
+        <meshStandardMaterial color="#1e3a5f" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 5.1, 0.35]} rotation={[0.3, 0, 0]} castShadow>
+        <boxGeometry args={[0.55, 0.05, 0.4]} />
+        <meshStandardMaterial color="#1e3a5f" roughness={0.8} />
+      </mesh>
+      
+      {/* Throwing arm (right arm for RHP) */}
+      <group ref={armRef} position={[0.45, 4, 0]}>
+        {/* Upper arm */}
+        <mesh position={[0.25, 0, 0]} rotation={[0, 0, -Math.PI / 6]} castShadow>
+          <capsuleGeometry args={[0.12, 0.5, 8, 16]} />
+          <meshStandardMaterial color="#d4a574" roughness={0.6} />
+        </mesh>
+        {/* Forearm */}
+        <mesh position={[0.5, -0.2, 0]} rotation={[0, 0, -Math.PI / 4]} castShadow>
+          <capsuleGeometry args={[0.1, 0.45, 8, 16]} />
+          <meshStandardMaterial color="#d4a574" roughness={0.6} />
+        </mesh>
+        {/* Hand */}
+        <mesh position={[0.65, -0.35, 0]} castShadow>
+          <sphereGeometry args={[0.1, 8, 8]} />
+          <meshStandardMaterial color="#d4a574" roughness={0.6} />
+        </mesh>
+      </group>
+      
+      {/* Glove arm (left arm) - held in front */}
+      <group position={[-0.45, 4, 0]}>
+        <mesh position={[-0.3, 0.1, 0.3]} rotation={[0.5, 0.3, Math.PI / 6]} castShadow>
+          <capsuleGeometry args={[0.12, 0.5, 8, 16]} />
+          <meshStandardMaterial color="#d4a574" roughness={0.6} />
+        </mesh>
+        {/* Glove */}
+        <mesh position={[-0.55, 0.1, 0.5]} castShadow>
+          <sphereGeometry args={[0.22, 12, 12]} />
+          <meshStandardMaterial color="#8B4513" roughness={0.9} />
+        </mesh>
+      </group>
+      
+      {/* Legs */}
+      <group position={[0, 2.2, 0]}>
+        {/* Back leg (pivot/plant foot) */}
+        <mesh position={[-0.2, -0.8, 0]} castShadow>
+          <capsuleGeometry args={[0.15, 1.4, 8, 16]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.7} />
+        </mesh>
+        {/* Front leg (stride leg) */}
+        <group ref={frontLegRef} position={[0.2, -0.8, 0]}>
+          <mesh castShadow>
+            <capsuleGeometry args={[0.15, 1.4, 8, 16]} />
+            <meshStandardMaterial color="#ffffff" roughness={0.7} />
+          </mesh>
+          {/* Cleat */}
+          <mesh position={[0, -0.9, 0.05]} castShadow>
+            <boxGeometry args={[0.2, 0.1, 0.35]} />
+            <meshStandardMaterial color="#333333" roughness={0.9} />
+          </mesh>
+        </group>
+      </group>
+      
+      {/* Back cleat */}
+      <mesh position={[-0.2, 0.6, 0.05]} castShadow>
+        <boxGeometry args={[0.2, 0.1, 0.35]} />
+        <meshStandardMaterial color="#333333" roughness={0.9} />
+      </mesh>
+    </group>
   );
 }
 
@@ -337,48 +482,53 @@ function BaseballField() {
 function CameraController({ 
   pitchProgress, 
   isAnimating, 
-  showResult 
+  showResult,
+  ballPosition
 }: { 
   pitchProgress: number; 
   isAnimating: boolean;
   showResult: boolean;
+  ballPosition: THREE.Vector3;
 }) {
   const { camera } = useThree();
-  const targetPosition = useRef(new THREE.Vector3(1, 6, 62));
-  const targetLookAt = useRef(new THREE.Vector3(0, 3, 0));
+  const targetPosition = useRef(new THREE.Vector3(3, 8, MOUND_TO_PLATE + 5));
   
-  // Initial pitcher view position (close behind pitcher)
-  const pitcherViewPos = new THREE.Vector3(1, 6, 65);
-  const pitcherLookAt = new THREE.Vector3(0, 4, 30);
+  // Initial view position (behind and to the side of pitcher)
+  const initialPos = new THREE.Vector3(3, 8, MOUND_TO_PLATE + 5);
   
-  // Side view position (90 degree rotation)
-  const sideViewPos = new THREE.Vector3(35, 5, 30);
-  const sideLookAt = new THREE.Vector3(0, 3, 25);
+  // Side view position for result
+  const sideViewPos = new THREE.Vector3(30, 8, 20);
+  
+  // Home plate view
+  const homePlatePos = new THREE.Vector3(5, 5, -8);
 
   useFrame(() => {
     if (isAnimating) {
-      // Camera follows ball from pitcher's perspective
-      const t = pitchProgress;
+      // Camera tracks the ball smoothly
+      const pitcherZ = MOUND_TO_PLATE - 1;
       
-      // Start close behind pitcher, follow ball towards plate
-      const camX = pitcherViewPos.x * (1 - t * 0.3);
-      const camY = pitcherViewPos.y * (1 - t * 0.3);
-      const camZ = 65 - t * 55;
+      // Camera moves from behind pitcher towards home plate
+      const t = pitchProgress;
+      const camZ = (pitcherZ + 5) * (1 - t * 0.6) + (-5) * t * 0.6;
+      const camX = 3 - t * 2;
+      const camY = 8 - t * 3;
       
       targetPosition.current.set(camX, camY, camZ);
-      targetLookAt.current.set(0, 4 - t * 1.5, 30 - t * 28);
+      
+      // Look at the ball
+      camera.lookAt(ballPosition);
     } else if (showResult) {
-      // Switch to side view to show trajectory
-      targetPosition.current.copy(sideViewPos);
-      targetLookAt.current.copy(sideLookAt);
+      // Smooth transition to side view
+      targetPosition.current.lerp(sideViewPos, 0.03);
+      camera.lookAt(0, 2.5, 5);
     } else {
-      // Return to initial position
-      targetPosition.current.copy(pitcherViewPos);
-      targetLookAt.current.copy(pitcherLookAt);
+      // Return to initial view
+      targetPosition.current.lerp(initialPos, 0.03);
+      camera.lookAt(0, 4, MOUND_TO_PLATE / 2);
     }
     
     // Smooth camera movement
-    camera.position.lerp(targetPosition.current, 0.03);
+    camera.position.lerp(targetPosition.current, 0.04);
   });
 
   return null;
@@ -392,11 +542,20 @@ interface Scene3DProps {
 }
 
 export default function Scene3D({ pitch, isAnimating, progress, showResult }: Scene3DProps) {
+  const [ballPosition, setBallPosition] = useState<THREE.Vector3>(
+    calculateBallPosition(pitch.trajectory, 0, false)
+  );
+  
+  // Calculate current ball position for camera tracking
+  const currentBallPos = useMemo(() => {
+    return calculateBallPosition(pitch.trajectory, progress, showResult);
+  }, [pitch.trajectory, progress, showResult]);
+
   return (
     <Canvas
       shadows
       className="w-full h-full"
-      camera={{ position: [1, 6, 65], fov: 55, near: 0.1, far: 200 }}
+      camera={{ position: [3, 8, MOUND_TO_PLATE + 5], fov: 50, near: 0.1, far: 200 }}
     >
       {/* Lighting */}
       <ambientLight intensity={0.5} />
@@ -412,13 +571,21 @@ export default function Scene3D({ pitch, isAnimating, progress, showResult }: Sc
       <Environment preset="sunset" />
       
       {/* Camera controller */}
-      <CameraController pitchProgress={progress} isAnimating={isAnimating} showResult={showResult} />
+      <CameraController 
+        pitchProgress={progress} 
+        isAnimating={isAnimating} 
+        showResult={showResult}
+        ballPosition={currentBallPos}
+      />
       
       {/* Field elements */}
       <BaseballField />
       <PitchersMound />
       <HomePlate />
       <StrikeZone />
+      
+      {/* Pitcher */}
+      <Pitcher pitchProgress={progress} isAnimating={isAnimating} />
       
       {/* Trajectory line */}
       <TrajectoryLine 
@@ -432,7 +599,6 @@ export default function Scene3D({ pitch, isAnimating, progress, showResult }: Sc
       
       {/* Baseball */}
       <Baseball
-        position={[pitch.trajectory.releaseX, pitch.trajectory.releaseY, pitch.trajectory.releaseZ]}
         trajectory={pitch.trajectory}
         isAnimating={isAnimating}
         progress={progress}
