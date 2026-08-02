@@ -266,8 +266,8 @@ function CameraController({
   const zonePos = new THREE.Vector3(3, 3, 10);
   const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
   
-  // Side view: perpendicular to home plate, looking straight at strike zone
-  const sidePos = new THREE.Vector3(40, 8, 0);
+  // Side view: perpendicular to home plate from right side, zoomed out
+  const sidePos = new THREE.Vector3(120, 20, 0);
   const sideLookAt = new THREE.Vector3(0, 2.5, 0);
 
   useFrame(() => {
@@ -320,8 +320,8 @@ function SideViewControls({ enabled }: { enabled: boolean }) {
       enablePan={true}
       enableZoom={true}
       enableRotate={true}
-      minDistance={15}
-      maxDistance={200}
+      minDistance={50}
+      maxDistance={300}
       target={[0, 2.5, 0]}
     />
   );
