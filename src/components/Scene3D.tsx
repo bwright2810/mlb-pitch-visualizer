@@ -266,7 +266,7 @@ function CameraController({
   const zonePos = new THREE.Vector3(3, 3, 10);
   const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
   
-  const sidePos = new THREE.Vector3(65, 18, 50);
+  const sidePos = new THREE.Vector3(110, 25, 30);
   const sideLookAt = new THREE.Vector3(0, 3, 2);
 
   useFrame(() => {
@@ -320,7 +320,7 @@ function SideViewControls({ enabled }: { enabled: boolean }) {
       enableZoom={true}
       enableRotate={true}
       minDistance={15}
-      maxDistance={120}
+      maxDistance={200}
       target={[0, 3, 2]}
     />
   );
