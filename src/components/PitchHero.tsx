@@ -226,7 +226,7 @@ const PitchHero: React.FC = () => {
               </div>
 
               {/* Mobile scroll hint - appears after animation on mobile */}
-              <div className={`absolute bottom-16 left-1/2 -translate-x-1/2 transition-opacity duration-500 sm:hidden pointer-events-none ${showResult && !isAnimating ? 'opacity-100' : 'opacity-0'}`}>>
+              <div className={`absolute bottom-16 left-1/2 -translate-x-1/2 transition-opacity duration-500 sm:hidden pointer-events-none ${showResult && !isAnimating ? 'opacity-100' : 'opacity-0'}`}>
                 <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs animate-bounce ${isDarkMode ? 'bg-gray-800/70 text-gray-300' : 'bg-white/70 text-gray-600'}`}>
                   <span>↕</span> Scroll for details
                 </div>
