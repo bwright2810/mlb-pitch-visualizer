@@ -2,7 +2,7 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment, Line, Text } from '@react-three/drei';
+import { Environment, Line, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { Pitch } from '@/types/pitch';
 
@@ -20,72 +20,28 @@ interface BaseballProps {
   onPositionUpdate?: (pos: THREE.Vector3) => void;
 }
 
-// Create a baseball with seams texture
+// Create a baseball with proper seam geometry
 function BaseballMesh({ position }: { position: [number, number, number] }) {
   return (
     <group position={position} scale={1.5}>
       {/* Main ball - white leather */}
       <mesh castShadow>
         <sphereGeometry args={[0.15, 32, 32]} />
-        <meshStandardMaterial color="#f5f5f5" roughness={0.3} />
+        <meshStandardMaterial color="#f8f8f8" roughness={0.4} />
       </mesh>
       
-      {/* Red seams - curved lines */}
-      {/* Left seam curve */}
-      <Line
-        points={[
-          [0, 0.12, 0.05],
-          [-0.08, 0.1, 0.1],
-          [-0.12, 0.05, 0.12],
-          [-0.13, -0.02, 0.12],
-          [-0.12, -0.08, 0.1],
-          [-0.08, -0.12, 0.05],
-          [0, -0.14, 0],
-        ]}
-        color="#cc0000"
-        lineWidth={2}
-      />
-      <Line
-        points={[
-          [0, 0.12, -0.05],
-          [-0.08, 0.1, -0.1],
-          [-0.12, 0.05, -0.12],
-          [-0.13, -0.02, -0.12],
-          [-0.12, -0.08, -0.1],
-          [-0.08, -0.12, -0.05],
-          [0, -0.14, 0],
-        ]}
-        color="#cc0000"
-        lineWidth={2}
-      />
+      {/* Red seams using torus geometry - figure-8 pattern */}
+      {/* Left seam */}
+      <mesh position={[-0.02, 0, 0]} rotation={[0, 0, Math.PI / 4]}>
+        <torusGeometry args={[0.1, 0.012, 8, 32, Math.PI * 1.5]} />
+        <meshStandardMaterial color="#c41e3a" roughness={0.5} />
+      </mesh>
       
-      {/* Right seam curve */}
-      <Line
-        points={[
-          [0, 0.12, 0.05],
-          [0.08, 0.1, 0.1],
-          [0.12, 0.05, 0.12],
-          [0.13, -0.02, 0.12],
-          [0.12, -0.08, 0.1],
-          [0.08, -0.12, 0.05],
-          [0, -0.14, 0],
-        ]}
-        color="#cc0000"
-        lineWidth={2}
-      />
-      <Line
-        points={[
-          [0, 0.12, -0.05],
-          [0.08, 0.1, -0.1],
-          [0.12, 0.05, -0.12],
-          [0.13, -0.02, -0.12],
-          [0.12, -0.08, -0.1],
-          [0.08, -0.12, -0.05],
-          [0, -0.14, 0],
-        ]}
-        color="#cc0000"
-        lineWidth={2}
-      />
+      {/* Right seam */}
+      <mesh position={[0.02, 0, 0]} rotation={[0, 0, -Math.PI / 4]}>
+        <torusGeometry args={[0.1, 0.012, 8, 32, Math.PI * 1.5]} />
+        <meshStandardMaterial color="#c41e3a" roughness={0.5} />
+      </mesh>
     </group>
   );
 }
@@ -135,17 +91,19 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
     }
   }, [currentPos, onPositionUpdate]);
 
-  // Rotation speed based on spin rate
+  // Rotation speed based on spin rate (much slower for visual clarity)
   useEffect(() => {
-    const avgSpin = (trajectory.spinAxis || 180) / 180;
-    setRotationSpeed(isAnimating ? avgSpin * 0.15 : 0.02);
-  }, [isAnimating, trajectory.spinAxis]);
+    // Spin rate in RPM - scale down significantly for visual
+    const spinRpm = trajectory.spinRateRpm || 2000;
+    const normalizedSpin = Math.min(spinRpm / 3000, 1); // normalize to 0-1
+    setRotationSpeed(isAnimating ? normalizedSpin * 0.3 : 0.01);
+  }, [isAnimating, trajectory.spinRateRpm]);
 
-  // Spin the ball
+  // Spin the ball - use delta for frame-rate independence
   useFrame((_, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.x += rotationSpeed;
-      groupRef.current.rotation.z += rotationSpeed * 0.5;
+      groupRef.current.rotation.x += rotationSpeed * delta * 60;
+      groupRef.current.rotation.z += rotationSpeed * delta * 30;
     }
   });
 
@@ -248,7 +206,7 @@ function Pitcher({ pitchProgress, isAnimating }: { pitchProgress: number; isAnim
       {/* Body/Torso - jersey */}
       <mesh position={[0, 3.5, 0]} castShadow>
         <capsuleGeometry args={[0.35, 1.2, 8, 16]} />
-n        <meshStandardMaterial color="#1e3a5f" roughness={0.7} />
+        <meshStandardMaterial color="#1e3a5f" roughness={0.7} />
       </mesh>
       
       {/* Head */}
@@ -504,19 +462,24 @@ function CameraController({
 
   useFrame(() => {
     if (isAnimating) {
-      // Camera tracks the ball smoothly
+      // Camera follows ball trajectory smoothly
       const pitcherZ = MOUND_TO_PLATE - 1;
+      const t = pitchProgress;
       
       // Camera moves from behind pitcher towards home plate
-      const t = pitchProgress;
       const camZ = (pitcherZ + 5) * (1 - t * 0.6) + (-5) * t * 0.6;
       const camX = 3 - t * 2;
       const camY = 8 - t * 3;
       
       targetPosition.current.set(camX, camY, camZ);
       
-      // Look at the ball
-      camera.lookAt(ballPosition);
+      // Smoothly look towards ball position
+      const lookTarget = new THREE.Vector3(
+        ballPosition.x * 0.3,
+        ballPosition.y + 1,
+        ballPosition.z
+      );
+      camera.lookAt(lookTarget);
     } else if (showResult) {
       // Smooth transition to side view
       targetPosition.current.lerp(sideViewPos, 0.03);
@@ -605,15 +568,7 @@ export default function Scene3D({ pitch, isAnimating, progress, showResult }: Sc
         showResult={showResult}
       />
       
-      {/* Limited orbit controls */}
-      <OrbitControls
-        enablePan={false}
-        enableZoom={false}
-        enableRotate={showResult}
-        minPolarAngle={Math.PI / 4}
-        maxPolarAngle={Math.PI / 2 - 0.1}
-        target={[0, 3, 25]}
-      />
+      {/* Camera controlled by CameraController only */}
     </Canvas>
   );
 }

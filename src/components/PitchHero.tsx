@@ -13,9 +13,7 @@ const PitchHero: React.FC = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showResult, setShowResult] = useState(false);
-  const [showGrip, setShowGrip] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [showInfo, setShowInfo] = useState(false);
 
   // Animation logic
   const animatePitch = useCallback(() => {
@@ -142,9 +140,9 @@ const PitchHero: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Grid - Changed to prioritize 3D view */}
+        {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* 3D Visualizer - Vertical Rectangle */}
+          {/* 3D Visualizer */}
           <div className={`lg:col-span-2 rounded-2xl overflow-hidden shadow-2xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
             <div className="aspect-[9/16] sm:aspect-[4/5] lg:aspect-[3/4] relative">
               <Scene3D 
@@ -246,76 +244,27 @@ const PitchHero: React.FC = () => {
               </p>
             </div>
 
-            {/* Grip Section */}
-            <div className={`rounded-xl overflow-hidden ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
-              <button
-                onClick={() => setShowGrip(!showGrip)}
-                className={`w-full p-4 flex items-center justify-between transition-colors ${isDarkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'}`}
-              >
-                <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : ''}`}>🖐️ Grip & Release</h3>
-                <span className={`transform transition-transform ${showGrip ? 'rotate-180' : ''}`}>
-                  ▼
-                </span>
-              </button>
-              
-              {showGrip && (
-                <div className={`p-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <GripVisualization pitch={selectedPitch} />
-                </div>
-              )}
+            {/* Grip Section - Always visible */}
+            <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
+              <h3 className={`text-lg font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>🖐️ Grip & Release</h3>
+              <GripVisualization pitch={selectedPitch} />
             </div>
 
-            {/* More Info Toggle */}
-            <button
-              onClick={() => setShowInfo(!showInfo)}
-              className={`w-full p-3 rounded-xl text-center font-medium transition-colors ${
-                isDarkMode ? 'bg-gray-800/50 hover:bg-gray-700/50' : 'bg-white shadow hover:bg-gray-50'
-              }`}
-            >
-              {showInfo ? '▲ Less Details' : '▼ More Details'}
-            </button>
-
-            {/* Extended Info */}
-            {showInfo && (
-              <div className={`space-y-3 animate-in fade-in ${isDarkMode ? 'text-white' : ''}`}>
-                <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
-                  <h4 className="font-semibold text-gray-400 text-sm mb-1">When to Use</h4>
-                  <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>{selectedPitch.usage}</p>
-                </div>
-                <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
-                  <h4 className="font-semibold text-gray-400 text-sm mb-1">Break Direction</h4>
-                  <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
-                    {selectedPitch.breakDirection === 'vertical' && 'Primary vertical movement (up/down)'}
-                    {selectedPitch.breakDirection === 'horizontal' && 'Primary horizontal movement (left/right)'}
-                    {selectedPitch.breakDirection === 'both' && 'Combination of vertical and horizontal movement'}
-                  </p>
-                </div>
+            {/* Extended Info - Always visible */}
+            <div className={`space-y-3 ${isDarkMode ? 'text-white' : ''}`}>
+              <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
+                <h4 className="font-semibold text-gray-400 text-sm mb-1">When to Use</h4>
+                <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>{selectedPitch.usage}</p>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Pitch Comparison */}
-        <div className={`mt-6 p-4 rounded-2xl ${isDarkMode ? 'bg-gray-800/30' : 'bg-white/50'}`}>
-          <h3 className={`text-xl font-bold mb-4 ${isDarkMode ? 'text-white' : ''}`}>All Pitch Types</h3>
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-            {PITCH_TYPES.map((pitch) => (
-              <button
-                key={pitch.id}
-                onClick={() => setSelectedPitch(pitch)}
-                className={`p-3 rounded-lg text-center transition-all ${
-                  selectedPitch.id === pitch.id
-                    ? 'scale-105 border-2'
-                    : 'hover:scale-102 border-2 border-transparent'
-                } ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700' : 'bg-white shadow hover:shadow-md'}`}
-                style={selectedPitch.id === pitch.id ? { borderColor: pitch.color } : {}}
-              >
-                <div className="text-2xl mb-1">⚾</div>
-                <div className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                  {pitch.name.split(' ')[0]}
-                </div>
-              </button>
-            ))}
+              <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
+                <h4 className="font-semibold text-gray-400 text-sm mb-1">Break Direction</h4>
+                <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+                  {selectedPitch.breakDirection === 'vertical' && 'Primary vertical movement (up/down)'}
+                  {selectedPitch.breakDirection === 'horizontal' && 'Primary horizontal movement (left/right)'}
+                  {selectedPitch.breakDirection === 'both' && 'Combination of vertical and horizontal movement'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </main>
