@@ -224,13 +224,6 @@ const PitchHero: React.FC = () => {
               <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-sm font-mono ${isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'}`}>
                 {selectedPitch.velocity}
               </div>
-
-              {/* View mode indicator */}
-              {showResult && (
-                <div className={`absolute top-20 right-4 px-2 py-1 rounded text-xs ${isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'}`}>
-                  Side View
-                </div>
-              )}
             </div>
           </div>
 

@@ -266,7 +266,7 @@ function CameraController({
   const zonePos = new THREE.Vector3(3, 3, 10);
   const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
   
-  const sidePos = new THREE.Vector3(-45, 10, 30);
+  const sidePos = new THREE.Vector3(-90, 20, 60);
   const sideLookAt = new THREE.Vector3(5, 3, 15);
 
   useFrame(() => {
