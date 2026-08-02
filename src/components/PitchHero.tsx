@@ -18,6 +18,7 @@ const PitchHero: React.FC = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showResult, setShowResult] = useState(false);
+  const [sideView, setSideView] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   // Animation logic — uses real physics flight time
@@ -26,6 +27,7 @@ const PitchHero: React.FC = () => {
 
     // Reset if showing result
     setShowResult(false);
+    setSideView(false);
     setIsAnimating(true);
     setProgress(0);
 
@@ -47,7 +49,7 @@ const PitchHero: React.FC = () => {
       } else {
         setIsAnimating(false);
         // Show result after animation completes
-        setTimeout(() => setShowResult(true), 5000);
+        setTimeout(() => setShowResult(true), 500);
       }
     };
 
@@ -59,6 +61,7 @@ const PitchHero: React.FC = () => {
     setIsAnimating(false);
     setProgress(0);
     setShowResult(false);
+    setSideView(false);
   }, []);
 
   // Reset when pitch changes
@@ -155,6 +158,7 @@ const PitchHero: React.FC = () => {
                 isAnimating={isAnimating}
                 progress={progress}
                 showResult={showResult}
+                sideView={sideView}
               />
 
               {/* Overlay controls */}
@@ -182,6 +186,20 @@ const PitchHero: React.FC = () => {
                   >
                     {isAnimating ? '🔄 Pitching...' : '▶️ Throw Pitch'}
                   </button>
+                  {showResult && !isAnimating && (
+                    <button
+                      onClick={() => setSideView(!sideView)}
+                      className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                        sideView
+                          ? 'bg-purple-500 hover:bg-purple-600 text-white shadow-lg'
+                          : isDarkMode
+                            ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                            : 'bg-gray-200 hover:bg-gray-300'
+                      }`}
+                    >
+                      {sideView ? '📺 Main View' : '🎥 Side View'}
+                    </button>
+                  )}
                   {(progress > 0 || showResult) && !isAnimating && (
                     <button
                       onClick={resetAnimation}

@@ -17,17 +17,6 @@ const STRIKE_ZONE_WIDTH = 1.42; // 17 inches
 const STRIKE_ZONE_HEIGHT = 1.84; // 22 inches
 const MOUND_HEIGHT = 0.61; // 10 inches
 
-interface BaseballProps {
-  trajectory: Pitch['trajectory'];
-  isAnimating: boolean;
-  progress: number;
-  showResult: boolean;
-  onPositionUpdate?: (pos: THREE.Vector3) => void;
-}
-
-/**
- * Convert Pitch trajectory data to TrajectoryParams for physics calculation.
- */
 function toTrajectoryParams(trajectory: Pitch['trajectory']): TrajectoryParams {
   return {
     releaseX: trajectory.releaseX,
@@ -89,7 +78,13 @@ function BaseballMesh() {
   );
 }
 
-function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpdate }: BaseballProps) {
+function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpdate }: {
+  trajectory: Pitch['trajectory'];
+  isAnimating: boolean;
+  progress: number;
+  showResult: boolean;
+  onPositionUpdate?: (pos: THREE.Vector3) => void;
+}) {
   const spinGroupRef = useRef<THREE.Group>(null);
   const [rotationSpeed, setRotationSpeed] = useState(0.1);
 
@@ -135,7 +130,11 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
   );
 }
 
-function TrajectoryLine({ trajectory, progress, showResult }: { trajectory: Pitch['trajectory']; progress: number; showResult: boolean }) {
+function TrajectoryLine({ trajectory, progress, showResult }: {
+  trajectory: Pitch['trajectory'];
+  progress: number;
+  showResult: boolean;
+}) {
   const params = useMemo(() => toTrajectoryParams(trajectory), [trajectory]);
 
   const points = useMemo(() => {
@@ -154,17 +153,17 @@ function TrajectoryLine({ trajectory, progress, showResult }: { trajectory: Pitc
   }, [params, progress, showResult]);
 
   if (points.length < 2) return null;
-
   return <Line points={points} color="#60a5fa" lineWidth={2} opacity={showResult ? 0.8 : 0.6} transparent />;
 }
 
-function LandingIndicator({ trajectory, showResult }: { trajectory: Pitch['trajectory']; showResult: boolean }) {
+function LandingIndicator({ trajectory, showResult }: {
+  trajectory: Pitch['trajectory'];
+  showResult: boolean;
+}) {
   if (!showResult) return null;
-
   const x = trajectory.targetX;
   const y = trajectory.targetY;
   const zoneBottom = 1.5;
-
   const isInZone = Math.abs(x) < STRIKE_ZONE_WIDTH / 2 && y > zoneBottom && y < zoneBottom + STRIKE_ZONE_HEIGHT;
 
   return (
@@ -246,91 +245,82 @@ function BaseballField() {
   );
 }
 
-// Camera phases: tracking -> zoom on zone -> side view
-type CameraPhase = 'tracking' | 'zoomZone' | 'sideView';
-
 function CameraController({
   pitchProgress,
   isAnimating,
   showResult,
+  sideView,
   ballPosition
 }: {
   pitchProgress: number;
   isAnimating: boolean;
   showResult: boolean;
+  sideView: boolean;
   ballPosition: THREE.Vector3;
 }) {
   const { camera } = useThree();
-  const targetPosition = useRef(new THREE.Vector3(3, 8, MOUND_TO_PLATE + 5));
-  const targetLookAt = useRef(new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2));
-  const [phase, setPhase] = useState<CameraPhase>('tracking');
+  const targetPosition = useRef(new THREE.Vector3(2, 6.5, 63));
+  const targetLookAt = useRef(new THREE.Vector3(0, 5.5, 55));
+  const currentLookAt = useRef(new THREE.Vector3(0, 5.5, 55));
 
+  // Camera positions
   const initialPos = new THREE.Vector3(2, 6.5, 63); // Behind ball at release
   const initialLookAt = new THREE.Vector3(0, 5.5, 55); // Look at release point
 
-  // Zoomed view on strike zone (close-up from behind, looking at the zone)
-  const zoneZoomPos = new THREE.Vector3(3, 3, 8);
+  // Zoomed view on strike zone
+  const zoneZoomPos = new THREE.Vector3(4, 4, 10);
   const zoneZoomLookAt = new THREE.Vector3(0, 2.4, 0.5);
 
-  // Wide side view for full trajectory - shifted right so strike zone is in frame
+  // Wide side view
   const sideViewPos = new THREE.Vector3(55, 15, 30);
   const sideViewLookAt = new THREE.Vector3(0, 3, 2);
 
-  useEffect(() => {
-    if (isAnimating) {
-      setPhase('tracking');
-    } else if (showResult && phase === 'zoomZone') {
-      // After 5s pause in zoom, transition to side view
-      const timer = setTimeout(() => setPhase('sideView'), 5000);
-      return () => clearTimeout(timer);
-    } else if (showResult && phase === 'tracking') {
-      setPhase('zoomZone');
-    }
-  }, [isAnimating, showResult, phase]);
-
-  // When entering side view, position camera and let OrbitControls take over
-  useEffect(() => {
-    if (phase === 'sideView') {
-      camera.position.copy(sideViewPos);
-      camera.lookAt(sideViewLookAt);
-    }
-  }, [phase, camera]);
-
   useFrame(() => {
-    // Don't control camera when orbit controls are active (side view)
-    if (phase === 'sideView') {
-      return; // Let OrbitControls handle the camera
+    // When side view is active and not animating, OrbitControls takes over
+    if (sideView && !isAnimating) {
+      return;
     }
+
+    let targetPos: THREE.Vector3;
+    let targetLook: THREE.Vector3;
+    let lerpSpeed = 0.08;
 
     if (isAnimating) {
-      // Close tracking - camera follows just behind and above the ball
-      const ballZ = ballPosition.z;
-      const camZ = ballZ + 8; // 8 feet behind ball
-      const camX = ballPosition.x * 0.3 + 2; // Slight offset to side
-      const camY = ballPosition.y + 3; // Above ball
+      // Track ball closely - camera slightly behind and above
+      const camZ = ballPosition.z + 5; // 5 feet behind ball
+      const camX = ballPosition.x * 0.5 + 1.5; // Slight offset, centered
+      const camY = ballPosition.y + 2; // 2 feet above ball
 
-      targetPosition.current.set(camX, camY, Math.max(camZ, 10));
-      targetLookAt.current.lerp(ballPosition, 0.2);
-      camera.lookAt(targetLookAt.current);
-    } else if (phase === 'zoomZone') {
-      // Zoom in on strike zone
-      targetPosition.current.lerp(zoneZoomPos, 0.06);
-      targetLookAt.current.lerp(zoneZoomLookAt, 0.08);
-      camera.lookAt(targetLookAt.current);
+      targetPos = new THREE.Vector3(camX, Math.max(camY, 3), Math.max(camZ, 8));
+      targetLook = ballPosition.clone();
+      lerpSpeed = 0.15; // Faster tracking
+    } else if (sideView) {
+      // Jump to side view position
+      targetPos = sideViewPos;
+      targetLook = sideViewLookAt;
+      lerpSpeed = 0.04;
+    } else if (showResult) {
+      // Zoom into strike zone
+      targetPos = zoneZoomPos;
+      targetLook = zoneZoomLookAt;
+      lerpSpeed = 0.06;
     } else {
-      // Return to initial position (behind ball at release)
-      targetPosition.current.lerp(initialPos, 0.05);
-      targetLookAt.current.lerp(initialLookAt, 0.05);
-      camera.lookAt(initialLookAt);
+      // Initial position behind ball
+      targetPos = initialPos;
+      targetLook = initialLookAt;
+      lerpSpeed = 0.05;
     }
 
-    camera.position.lerp(targetPosition.current, 0.08);
+    targetPosition.current.lerp(targetPos, lerpSpeed);
+    currentLookAt.current.lerp(targetLook, lerpSpeed * 1.5);
+    
+    camera.position.copy(targetPosition.current);
+    camera.lookAt(currentLookAt.current);
   });
 
   return null;
 }
 
-// Orbit controls only enabled during side view
 function CameraControls({ enabled }: { enabled: boolean }) {
   return (
     <OrbitControls
@@ -345,23 +335,28 @@ function CameraControls({ enabled }: { enabled: boolean }) {
   );
 }
 
-interface Scene3DProps {
+export default function Scene3D({
+  pitch,
+  isAnimating,
+  progress,
+  showResult,
+  sideView
+}: {
   pitch: Pitch;
   isAnimating: boolean;
   progress: number;
   showResult: boolean;
-}
-
-export default function Scene3D({ pitch, isAnimating, progress, showResult }: Scene3DProps) {
+  sideView: boolean;
+}) {
   const [ballPosition, setBallPosition] = useState(new THREE.Vector3(0, 5, 55));
 
-  // Enable orbit controls when in side view phase (not animating and showing result)
-  const enableOrbitControls = !isAnimating && showResult;
+  // Enable orbit controls only in side view and not animating
+  const enableOrbitControls = sideView && !isAnimating;
 
   return (
     <Canvas
       shadows
-      camera={{ position: [4, 6, MOUND_TO_PLATE + 8], fov: 50 }}
+      camera={{ position: [2, 6.5, 63], fov: 50 }}
       style={{ background: '#0a0a0a' }}
     >
       <ambientLight intensity={0.4} />
@@ -401,6 +396,7 @@ export default function Scene3D({ pitch, isAnimating, progress, showResult }: Sc
         pitchProgress={progress}
         isAnimating={isAnimating}
         showResult={showResult}
+        sideView={sideView}
         ballPosition={ballPosition}
       />
 
