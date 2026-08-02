@@ -23,24 +23,24 @@ interface BaseballProps {
 // Create a baseball with proper seam geometry - larger scale for visibility
 function BaseballMesh({ position }: { position: [number, number, number] }) {
   return (
-    <group position={position} scale={2.5}>
-      {/* Main ball - white leather */}
+    <group position={position} scale={3}>
+      {/* Main ball - white leather with slight glow */}
       <mesh castShadow>
         <sphereGeometry args={[0.15, 32, 32]} />
-        <meshStandardMaterial color="#f8f8f8" roughness={0.4} emissive="#ffffff" emissiveIntensity={0.15} />
+        <meshStandardMaterial color="#f8f8f8" roughness={0.3} emissive="#ffffff" emissiveIntensity={0.2} />
       </mesh>
       
-      {/* Red seams using torus geometry - figure-8 pattern */}
+      {/* Red seams - larger torus for visibility */}
       {/* Left seam */}
       <mesh position={[-0.02, 0, 0]} rotation={[0, 0, Math.PI / 4]}>
-        <torusGeometry args={[0.1, 0.012, 8, 32, Math.PI * 1.5]} />
-        <meshStandardMaterial color="#c41e3a" roughness={0.5} />
+        <torusGeometry args={[0.1, 0.018, 8, 32, Math.PI * 1.5]} />
+        <meshStandardMaterial color="#c41e3a" roughness={0.4} emissive="#c41e3a" emissiveIntensity={0.3} />
       </mesh>
       
       {/* Right seam */}
       <mesh position={[0.02, 0, 0]} rotation={[0, 0, -Math.PI / 4]}>
-        <torusGeometry args={[0.1, 0.012, 8, 32, Math.PI * 1.5]} />
-        <meshStandardMaterial color="#c41e3a" roughness={0.5} />
+        <torusGeometry args={[0.1, 0.018, 8, 32, Math.PI * 1.5]} />
+        <meshStandardMaterial color="#c41e3a" roughness={0.4} emissive="#c41e3a" emissiveIntensity={0.3} />
       </mesh>
     </group>
   );
@@ -108,12 +108,19 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
   return (
     <group ref={groupRef}>
       <BaseballMesh position={[currentPos.x, currentPos.y, currentPos.z]} />
-      {/* Glow effect during animation */}
+      {/* Glow effect during animation - larger and more visible */}
       {isAnimating && (
-        <mesh position={[currentPos.x, currentPos.y, currentPos.z]}>
-          <sphereGeometry args={[0.5, 16, 16]} />
-          <meshBasicMaterial color="#93c5fd" transparent opacity={0.15} />
-        </mesh>
+        <>
+          <mesh position={[currentPos.x, currentPos.y, currentPos.z]}>
+            <sphereGeometry args={[0.8, 16, 16]} />
+            <meshBasicMaterial color="#60a5fa" transparent opacity={0.25} />
+          </mesh>
+          {/* Inner glow */}
+          <mesh position={[currentPos.x, currentPos.y, currentPos.z]}>
+            <sphereGeometry args={[0.5, 16, 16]} />
+            <meshBasicMaterial color="#93c5fd" transparent opacity={0.35} />
+          </mesh>
+        </>
       )}
     </group>
   );
@@ -469,56 +476,57 @@ function CameraController({
 }) {
   const { camera } = useThree();
   const targetPosition = useRef(new THREE.Vector3(3, 8, MOUND_TO_PLATE + 5));
-  const targetLookAt = useRef(new THREE.Vector3(0, 4, MOUND_TO_PLATE / 2));
+  const targetLookAt = useRef(new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2));
   
   // Initial view position (behind and to the side of pitcher)
-  const initialPos = new THREE.Vector3(3, 8, MOUND_TO_PLATE + 5);
-  const initialLookAt = new THREE.Vector3(0, 4, MOUND_TO_PLATE / 2);
+  const initialPos = new THREE.Vector3(4, 6, MOUND_TO_PLATE + 8);
+  const initialLookAt = new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2);
   
   // Side view position for result
-  const sideViewPos = new THREE.Vector3(15, 5, 20);
+  const sideViewPos = new THREE.Vector3(12, 4, 15);
   const sideViewLookAt = new THREE.Vector3(0, 2.5, 5);
 
   useFrame(() => {
     if (isAnimating) {
-      // Camera follows ball with gentle tracking - stay behind pitcher area
-      // but smoothly pan to keep the ball in view
+      // Gentle camera tracking - stays mostly behind pitcher with subtle movement
       const t = pitchProgress;
       
-      // Keep camera mostly in place with subtle movement toward home plate
-      // Avoid extreme camera positions that cause blank renders
-      const camZ = MOUND_TO_PLATE + 5 - t * 10; // Subtle forward drift, never goes negative
-      const camX = 3 - t * 1.5; // Subtle horizontal shift
-      const camY = 8 - t * 2; // Subtle height decrease, stays well above field
+      // Camera drifts forward slightly but stays behind pitcher area
+      const camZ = MOUND_TO_PLATE + 5 - t * 8; // Subtle forward drift, stays positive
+      const camX = 4 - t * 1.5; // Subtle horizontal shift
+      const camY = 6 - t * 1; // Subtle height decrease
       
-      targetPosition.current.set(camX, Math.max(camY, 4), Math.max(camZ, 10));
-      
-      // Look at a point between ball and home plate area
-      const lookX = ballPosition.x * 0.2;
-      const lookY = Math.max(ballPosition.y * 0.5 + 2, 2);
-      const lookZ = ballPosition.z * 0.5 + 5;
-      targetLookAt.current.set(lookX, lookY, lookZ);
-      
-      // Smoothly interpolate look target
-      camera.lookAt(
-        THREE.MathUtils.lerp(camera.position.x + (targetLookAt.current.x - camera.position.x) * 0.1, targetLookAt.current.x, 0.05),
-        THREE.MathUtils.lerp(camera.position.y + (targetLookAt.current.y - camera.position.y) * 0.1, targetLookAt.current.y, 0.05),
-        THREE.MathUtils.lerp(camera.position.z + (targetLookAt.current.z - camera.position.z) * 0.1, targetLookAt.current.z, 0.05)
+      targetPosition.current.set(
+        Math.max(camX, 1), 
+        Math.max(camY, 3), 
+        Math.max(camZ, 15)
       );
+      
+      // Look at ball with smooth interpolation
+      targetLookAt.current.lerp(
+        new THREE.Vector3(
+          ballPosition.x * 0.3,
+          Math.max(ballPosition.y * 0.5 + 2, 2),
+          ballPosition.z * 0.5 + 10
+        ),
+        0.05
+      );
+      
+      camera.lookAt(targetLookAt.current);
     } else if (showResult) {
       // Smooth transition to side view
-      targetPosition.current.lerp(sideViewPos, 0.03);
-      targetLookAt.current.lerp(sideViewLookAt, 0.05);
+      targetPosition.current.lerp(sideViewPos, 0.02);
+      targetLookAt.current.lerp(sideViewLookAt, 0.03);
       camera.lookAt(targetLookAt.current);
     } else {
-      // Return to initial view
-      targetPosition.current.lerp(initialPos, 0.03);
-      targetLookAt.current.lerp(initialLookAt, 0.05);
+      // Return to initial view smoothly
+      targetPosition.current.lerp(initialPos, 0.02);
+      targetLookAt.current.lerp(initialLookAt, 0.03);
       camera.lookAt(targetLookAt.current);
     }
     
     // Smooth camera movement
-    camera.position.lerp(targetPosition.current, 0.04);
+    camera.position.lerp(targetPosition.current, 0.03);
   });
 
   return null;
