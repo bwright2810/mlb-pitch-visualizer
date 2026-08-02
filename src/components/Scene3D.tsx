@@ -266,9 +266,8 @@ function CameraController({
   const zonePos = new THREE.Vector3(3, 3, 10);
   const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
   
-  // Side view: positioned on the side, looking at home plate (strike zone)
-  // Strike zone is at z≈0, pitcher at z≈55
-  const sidePos = new THREE.Vector3(25, 8, 0);
+  // Side view: perpendicular to home plate, looking straight at strike zone
+  const sidePos = new THREE.Vector3(40, 8, 0);
   const sideLookAt = new THREE.Vector3(0, 2.5, 0);
 
   useFrame(() => {
