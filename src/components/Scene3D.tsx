@@ -375,8 +375,9 @@ function CameraController({
 
   const initialPos = new THREE.Vector3(4, 6, MOUND_TO_PLATE + 8);
   const initialLookAt = new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2);
-  const sideViewPos = new THREE.Vector3(10, 3, 8);
-  const sideViewLookAt = new THREE.Vector3(0, 2.5, 2);
+  // Wide side view to show full trajectory arc from release to plate
+  const sideViewPos = new THREE.Vector3(28, 12, 30);
+  const sideViewLookAt = new THREE.Vector3(0, 4, 28);
 
   useFrame(() => {
     if (isAnimating) {
@@ -399,8 +400,8 @@ function CameraController({
 
       camera.lookAt(targetLookAt.current);
     } else if (showResult) {
-      targetPosition.current.lerp(sideViewPos, 0.08);
-      targetLookAt.current.lerp(sideViewLookAt, 0.1);
+      targetPosition.current.lerp(sideViewPos, 0.04);
+      targetLookAt.current.lerp(sideViewLookAt, 0.05);
       camera.lookAt(targetLookAt.current);
     } else {
       targetPosition.current.lerp(initialPos, 0.05);
