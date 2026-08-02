@@ -265,30 +265,43 @@ function CameraController({
   const targetLookAt = useRef(new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2));
   const [phase, setPhase] = useState<CameraPhase>('tracking');
 
-  const initialPos = new THREE.Vector3(4, 6, MOUND_TO_PLATE + 8);
-  const initialLookAt = new THREE.Vector3(0, 3, MOUND_TO_PLATE / 2);
+  const initialPos = new THREE.Vector3(2, 6.5, 63); // Behind ball at release
+  const initialLookAt = new THREE.Vector3(0, 5.5, 55); // Look at release point
 
-  // Zoomed view on strike zone (close-up from behind pitcher side)
-  const zoneZoomPos = new THREE.Vector3(6, 4, 12);
+  // Zoomed view on strike zone (close-up from behind, looking at the zone)
+  const zoneZoomPos = new THREE.Vector3(3, 3, 8);
   const zoneZoomLookAt = new THREE.Vector3(0, 2.4, 0.5);
 
-  // Wide side view for full trajectory
-  const sideViewPos = new THREE.Vector3(45, 20, 50);
-  const sideViewLookAt = new THREE.Vector3(0, 4, 28);
+  // Wide side view for full trajectory - shifted right so strike zone is in frame
+  const sideViewPos = new THREE.Vector3(55, 15, 30);
+  const sideViewLookAt = new THREE.Vector3(0, 3, 2);
 
   useEffect(() => {
     if (isAnimating) {
       setPhase('tracking');
     } else if (showResult && phase === 'zoomZone') {
-      // After zoom phase completes, transition to side view
-      const timer = setTimeout(() => setPhase('sideView'), 1500);
+      // After 5s pause in zoom, transition to side view
+      const timer = setTimeout(() => setPhase('sideView'), 5000);
       return () => clearTimeout(timer);
     } else if (showResult && phase === 'tracking') {
       setPhase('zoomZone');
     }
   }, [isAnimating, showResult, phase]);
 
+  // When entering side view, position camera and let OrbitControls take over
+  useEffect(() => {
+    if (phase === 'sideView') {
+      camera.position.copy(sideViewPos);
+      camera.lookAt(sideViewLookAt);
+    }
+  }, [phase, camera]);
+
   useFrame(() => {
+    // Don't control camera when orbit controls are active (side view)
+    if (phase === 'sideView') {
+      return; // Let OrbitControls handle the camera
+    }
+
     if (isAnimating) {
       // Close tracking - camera follows just behind and above the ball
       const ballZ = ballPosition.z;
@@ -304,13 +317,8 @@ function CameraController({
       targetPosition.current.lerp(zoneZoomPos, 0.06);
       targetLookAt.current.lerp(zoneZoomLookAt, 0.08);
       camera.lookAt(targetLookAt.current);
-    } else if (phase === 'sideView') {
-      // Transition to wide side view
-      targetPosition.current.lerp(sideViewPos, 0.03);
-      targetLookAt.current.lerp(sideViewLookAt, 0.04);
-      camera.lookAt(targetLookAt.current);
     } else {
-      // Return to initial position
+      // Return to initial position (behind ball at release)
       targetPosition.current.lerp(initialPos, 0.05);
       targetLookAt.current.lerp(initialLookAt, 0.05);
       camera.lookAt(initialLookAt);
@@ -332,7 +340,7 @@ function CameraControls({ enabled }: { enabled: boolean }) {
       enableRotate={true}
       minDistance={10}
       maxDistance={100}
-      target={[0, 4, 28]}
+      target={[0, 3, 2]}
     />
   );
 }
