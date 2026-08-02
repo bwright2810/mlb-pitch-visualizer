@@ -11,11 +11,10 @@ import {
   TrajectoryParams
 } from '@/lib/trajectory';
 
-// Constants for baseball field dimensions (in feet)
 const MOUND_TO_PLATE = 60.5;
-const STRIKE_ZONE_WIDTH = 1.42; // 17 inches
-const STRIKE_ZONE_HEIGHT = 1.84; // 22 inches
-const MOUND_HEIGHT = 0.61; // 10 inches
+const STRIKE_ZONE_WIDTH = 1.42;
+const STRIKE_ZONE_HEIGHT = 1.84;
+const MOUND_HEIGHT = 0.61;
 
 function toTrajectoryParams(trajectory: Pitch['trajectory']): TrajectoryParams {
   return {
@@ -246,90 +245,82 @@ function BaseballField() {
 }
 
 function CameraController({
-  pitchProgress,
   isAnimating,
   showResult,
   sideView,
   ballPosition
 }: {
-  pitchProgress: number;
   isAnimating: boolean;
   showResult: boolean;
   sideView: boolean;
   ballPosition: THREE.Vector3;
 }) {
   const { camera } = useThree();
-  const targetPosition = useRef(new THREE.Vector3(2, 6.5, 63));
-  const targetLookAt = useRef(new THREE.Vector3(0, 5.5, 55));
+  const currentPos = useRef(new THREE.Vector3(2, 6.5, 63));
   const currentLookAt = useRef(new THREE.Vector3(0, 5.5, 55));
 
-  // Camera positions
-  const initialPos = new THREE.Vector3(2, 6.5, 63); // Behind ball at release
-  const initialLookAt = new THREE.Vector3(0, 5.5, 55); // Look at release point
-
-  // Zoomed view on strike zone (close-up from behind)
-  const zoneZoomPos = new THREE.Vector3(3, 3, 8);
-  const zoneZoomLookAt = new THREE.Vector3(0, 2.4, 0.5);
-
-  // Wide side view - more rotation, more zoomed out
-  const sideViewPos = new THREE.Vector3(60, 20, 45);
-  const sideViewLookAt = new THREE.Vector3(0, 3, 2);
+  // Define camera positions
+  const initialPos = new THREE.Vector3(2, 6.5, 63);
+  const initialLookAt = new THREE.Vector3(0, 5.5, 55);
+  
+  const zonePos = new THREE.Vector3(3, 3, 10);
+  const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
+  
+  const sidePos = new THREE.Vector3(65, 18, 50);
+  const sideLookAt = new THREE.Vector3(0, 3, 2);
 
   useFrame(() => {
-    // When side view is active and not animating, OrbitControls takes over
+    // Side view: OrbitControls takes over
     if (sideView && !isAnimating) {
       return;
     }
 
     let targetPos: THREE.Vector3;
     let targetLook: THREE.Vector3;
-    let lerpSpeed = 0.08;
+    let speed = 0.05;
 
     if (isAnimating) {
-      // Track ball closely - camera slightly behind and above
-      const camZ = ballPosition.z + 5; // 5 feet behind ball
-      const camX = ballPosition.x * 0.5 + 1.5; // Slight offset, centered
-      const camY = ballPosition.y + 2; // 2 feet above ball
-
-      targetPos = new THREE.Vector3(camX, Math.max(camY, 3), Math.max(camZ, 8));
+      // Track ball
+      const camZ = ballPosition.z + 5;
+      const camX = ballPosition.x * 0.5 + 1.5;
+      const camY = Math.max(ballPosition.y + 2, 3);
+      targetPos = new THREE.Vector3(camX, camY, Math.max(camZ, 8));
       targetLook = ballPosition.clone();
-      lerpSpeed = 0.15; // Faster tracking
+      speed = 0.12;
     } else if (sideView) {
-      // Jump to side view position
-      targetPos = sideViewPos;
-      targetLook = sideViewLookAt;
-      lerpSpeed = 0.04;
+      targetPos = sidePos;
+      targetLook = sideLookAt;
+      speed = 0.03;
     } else if (showResult) {
-      // Zoom into strike zone
-      targetPos = zoneZoomPos;
-      targetLook = zoneZoomLookAt;
-      lerpSpeed = 0.06;
+      targetPos = zonePos;
+      targetLook = zoneLookAt;
+      speed = 0.04;
     } else {
-      // Initial position behind ball
       targetPos = initialPos;
       targetLook = initialLookAt;
-      lerpSpeed = 0.05;
+      speed = 0.05;
     }
 
-    targetPosition.current.lerp(targetPos, lerpSpeed);
-    currentLookAt.current.lerp(targetLook, lerpSpeed * 1.5);
+    // Smooth lerp
+    currentPos.current.lerp(targetPos, speed);
+    currentLookAt.current.lerp(targetLook, speed);
     
-    camera.position.copy(targetPosition.current);
+    camera.position.copy(currentPos.current);
     camera.lookAt(currentLookAt.current);
   });
 
   return null;
 }
 
-function CameraControls({ enabled }: { enabled: boolean }) {
+function SideViewControls({ enabled }: { enabled: boolean }) {
   return (
     <OrbitControls
       enabled={enabled}
       enablePan={true}
       enableZoom={true}
       enableRotate={true}
-      minDistance={10}
-      maxDistance={100}
+      minDistance={15}
+      maxDistance={120}
       target={[0, 3, 2]}
     />
   );
@@ -350,7 +341,6 @@ export default function Scene3D({
 }) {
   const [ballPosition, setBallPosition] = useState(new THREE.Vector3(0, 5, 55));
 
-  // Enable orbit controls only in side view and not animating
   const enableOrbitControls = sideView && !isAnimating;
 
   return (
@@ -360,12 +350,7 @@ export default function Scene3D({
       style={{ background: '#0a0a0a' }}
     >
       <ambientLight intensity={0.4} />
-      <directionalLight
-        position={[10, 20, 10]}
-        intensity={1}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-      />
+      <directionalLight position={[10, 20, 10]} intensity={1} castShadow shadow-mapSize={[2048, 2048]} />
       <pointLight position={[0, 10, 30]} intensity={0.5} />
 
       <BaseballField />
@@ -381,26 +366,17 @@ export default function Scene3D({
         onPositionUpdate={setBallPosition}
       />
 
-      <TrajectoryLine
-        trajectory={pitch.trajectory}
-        progress={progress}
-        showResult={showResult}
-      />
-
-      <LandingIndicator
-        trajectory={pitch.trajectory}
-        showResult={showResult}
-      />
+      <TrajectoryLine trajectory={pitch.trajectory} progress={progress} showResult={showResult} />
+      <LandingIndicator trajectory={pitch.trajectory} showResult={showResult} />
 
       <CameraController
-        pitchProgress={progress}
         isAnimating={isAnimating}
         showResult={showResult}
         sideView={sideView}
         ballPosition={ballPosition}
       />
 
-      <CameraControls enabled={enableOrbitControls} />
+      <SideViewControls enabled={enableOrbitControls} />
 
       <Environment preset="sunset" />
     </Canvas>
