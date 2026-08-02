@@ -267,7 +267,8 @@ function CameraController({
   const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
   
   // Side view: perpendicular to home plate from right side, zoomed out
-  const sidePos = new THREE.Vector3(120, 20, 0);
+  // Rotated to see trajectory from pitcher to home plate better
+  const sidePos = new THREE.Vector3(0, 20, -120);
   const sideLookAt = new THREE.Vector3(0, 2.5, 0);
 
   useFrame(() => {
@@ -317,7 +318,7 @@ function SideViewControls({ enabled }: { enabled: boolean }) {
   const controlsRef = useRef<any>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
-  const [rotationY, setRotationY] = useState(0);
+  const [rotationY, setRotationY] = useState(Math.PI);
 
   useEffect(() => {
     if (!enabled) return;
