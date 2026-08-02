@@ -91,19 +91,18 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
     }
   }, [currentPos, onPositionUpdate]);
 
-  // Rotation speed based on spin rate (much slower for visual clarity)
+  // Rotation speed - very slow for visual clarity (like slow-mo replay)
   useEffect(() => {
-    // Spin rate in RPM - scale down significantly for visual
-    const spinRpm = trajectory.spinRateRpm || 2000;
-    const normalizedSpin = Math.min(spinRpm / 3000, 1); // normalize to 0-1
-    setRotationSpeed(isAnimating ? normalizedSpin * 0.3 : 0.01);
-  }, [isAnimating, trajectory.spinRateRpm]);
+    // Gentle spin during animation, almost none when static
+    setRotationSpeed(isAnimating ? 0.5 : 0.05);
+  }, [isAnimating]);
 
-  // Spin the ball - use delta for frame-rate independence
+  // Spin the ball gently
   useFrame((_, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.x += rotationSpeed * delta * 60;
-      groupRef.current.rotation.z += rotationSpeed * delta * 30;
+      // Very slow rotation - radians per second, not RPM-based
+      groupRef.current.rotation.x += rotationSpeed * delta;
+      groupRef.current.rotation.z += rotationSpeed * delta * 0.5;
     }
   });
 
