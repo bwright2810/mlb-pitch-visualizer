@@ -151,7 +151,7 @@ const PitchHero: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* 3D Visualizer */}
           <div className={`lg:col-span-2 rounded-2xl overflow-hidden shadow-2xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <div className="aspect-[2/1] sm:aspect-[15/14] lg:aspect-[45/49] relative">
+            <div className="aspect-[3/2] sm:aspect-[4/3] lg:aspect-[9/10] relative">
               <Scene3D
                 pitch={selectedPitch}
                 isAnimating={isAnimating}
@@ -161,10 +161,10 @@ const PitchHero: React.FC = () => {
               />
 
               {/* Overlay controls */}
-              <div className="absolute bottom-4 left-4 right-4">
+              <div className="absolute bottom-2 left-2 right-2">
                 {/* Result indicator */}
                 {showResult && (
-                  <div className={`mb-3 p-3 rounded-lg text-center font-bold ${
+                  <div className={`mb-2 px-3 py-1.5 rounded-md text-center text-sm font-bold ${
                     isStrike()
                       ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                       : 'bg-red-500/20 text-red-400 border border-red-500/30'
@@ -173,22 +173,22 @@ const PitchHero: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <button
                     onClick={animatePitch}
                     disabled={isAnimating}
-                    className={`flex-1 px-4 py-3 rounded-lg font-medium transition-all ${
+                    className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all ${
                       isAnimating
                         ? 'bg-gray-500 cursor-not-allowed'
                         : 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg'
                     }`}
                   >
-                    {isAnimating ? '🔄 Pitching...' : '▶️ Throw Pitch'}
+                    {isAnimating ? '🔄 Pitching...' : '▶️ Throw'}
                   </button>
                   {showResult && !isAnimating && (
                     <button
                       onClick={() => setSideView(!sideView)}
-                      className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
                         sideView
                           ? 'bg-purple-500 hover:bg-purple-600 text-white shadow-lg'
                           : isDarkMode
@@ -196,15 +196,15 @@ const PitchHero: React.FC = () => {
                             : 'bg-gray-200 hover:bg-gray-300'
                       }`}
                     >
-                      {sideView ? '📺 Main View' : '🎥 Side View'}
+                      {sideView ? '📺 Main' : '🎥 Side'}
                     </button>
                   )}
                   {(progress > 0 || showResult) && !isAnimating && (
                     <button
                       onClick={resetAnimation}
-                      className={`px-4 py-3 rounded-lg font-medium ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                      className={`px-3 py-2 rounded-md text-sm font-medium ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
                     >
-                      ↺ Reset
+                      ↺
                     </button>
                   )}
                 </div>
@@ -226,7 +226,7 @@ const PitchHero: React.FC = () => {
               </div>
 
               {/* Mobile scroll hint - appears after animation on mobile */}
-              <div className={`absolute bottom-20 left-1/2 -translate-x-1/2 transition-opacity duration-500 sm:hidden pointer-events-none ${showResult && !isAnimating ? 'opacity-100' : 'opacity-0'}`}>
+              <div className={`absolute bottom-16 left-1/2 -translate-x-1/2 transition-opacity duration-500 sm:hidden pointer-events-none ${showResult && !isAnimating ? 'opacity-100' : 'opacity-0'}`}>>
                 <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs animate-bounce ${isDarkMode ? 'bg-gray-800/70 text-gray-300' : 'bg-white/70 text-gray-600'}`}>
                   <span>↕</span> Scroll for details
                 </div>
