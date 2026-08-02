@@ -267,12 +267,12 @@ function CameraController({
   const initialPos = new THREE.Vector3(2, 6.5, 63); // Behind ball at release
   const initialLookAt = new THREE.Vector3(0, 5.5, 55); // Look at release point
 
-  // Zoomed view on strike zone
-  const zoneZoomPos = new THREE.Vector3(4, 4, 10);
+  // Zoomed view on strike zone (close-up from behind)
+  const zoneZoomPos = new THREE.Vector3(3, 3, 8);
   const zoneZoomLookAt = new THREE.Vector3(0, 2.4, 0.5);
 
-  // Wide side view
-  const sideViewPos = new THREE.Vector3(55, 15, 30);
+  // Wide side view - more rotation, more zoomed out
+  const sideViewPos = new THREE.Vector3(60, 20, 45);
   const sideViewLookAt = new THREE.Vector3(0, 3, 2);
 
   useFrame(() => {

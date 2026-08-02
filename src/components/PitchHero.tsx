@@ -48,8 +48,7 @@ const PitchHero: React.FC = () => {
         requestAnimationFrame(animate);
       } else {
         setIsAnimating(false);
-        // Show result after animation completes
-        setTimeout(() => setShowResult(true), 500);
+        setShowResult(true);
       }
     };
 
