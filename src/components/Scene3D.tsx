@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { Pitch } from '@/types/pitch';
 import {
   calculateBallPosition,
+  calculateNoBreakBallPosition,
   calculateTrajectoryPoints,
   TrajectoryParams
 } from '@/lib/trajectory';
@@ -132,8 +133,16 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
   );
 }
 
-function getVisibleTrajectoryPoints(params: TrajectoryParams, progress: number, showResult: boolean) {
-  if (showResult) return calculateTrajectoryPoints(params, 120);
+function getVisibleTrajectoryPoints(
+  params: TrajectoryParams,
+  progress: number,
+  showResult: boolean,
+  positionCalculator: typeof calculateBallPosition = calculateBallPosition,
+) {
+  if (showResult) {
+    if (positionCalculator === calculateBallPosition) return calculateTrajectoryPoints(params, 120);
+    return Array.from({ length: 121 }, (_, index) => positionCalculator(params, index / 120, false));
+  }
   if (progress <= 0.02) return [];
 
   const trailPoints: THREE.Vector3[] = [];
@@ -141,7 +150,7 @@ function getVisibleTrajectoryPoints(params: TrajectoryParams, progress: number, 
   const numPoints = Math.max(2, Math.floor((progress - startProgress) * 150));
   for (let i = 0; i <= numPoints; i++) {
     const t = startProgress + (i / numPoints) * (progress - startProgress);
-    trailPoints.push(calculateBallPosition(params, t, false));
+    trailPoints.push(positionCalculator(params, t, false));
   }
   return trailPoints;
 }
@@ -153,18 +162,12 @@ function TrajectoryLine({ trajectory, pitchColor, progress, showResult }: {
   showResult: boolean;
 }) {
   const params = useMemo(() => toTrajectoryParams(trajectory), [trajectory]);
-  const noBreakParams = useMemo(() => ({
-    ...params,
-    inducedVerticalBreak: 0,
-    horizontalBreak: 0,
-  }), [params]);
-
   const points = useMemo(() => {
     return getVisibleTrajectoryPoints(params, progress, showResult);
   }, [params, progress, showResult]);
   const noBreakPoints = useMemo(() => {
-    return getVisibleTrajectoryPoints(noBreakParams, progress, showResult);
-  }, [noBreakParams, progress, showResult]);
+    return getVisibleTrajectoryPoints(params, progress, showResult, calculateNoBreakBallPosition);
+  }, [params, progress, showResult]);
 
   if (points.length < 2 || noBreakPoints.length !== points.length) return null;
 
@@ -175,9 +178,6 @@ function TrajectoryLine({ trajectory, pitchColor, progress, showResult }: {
     vertical: point.y - noBreakPoints[index].y,
   }));
   const breakThreshold = 0.25 / 12;
-  const firstBreakIndex = breakOffsets.findIndex(({ horizontal, vertical }) => (
-    Math.hypot(horizontal, vertical) >= breakThreshold
-  ));
   const vectorStep = Math.max(1, Math.floor(points.length / 8));
   const vectorIndices = breakOffsets
     .map(({ horizontal, vertical }, index) => ({ horizontal, vertical, index }))
@@ -218,16 +218,6 @@ function TrajectoryLine({ trajectory, pitchColor, progress, showResult }: {
           />
         );
       })}
-      {firstBreakIndex >= 0 && (
-        <mesh position={[
-          points[firstBreakIndex].x,
-          points[firstBreakIndex].y,
-          points[firstBreakIndex].z,
-        ]}>
-          <sphereGeometry args={[0.18, 16, 16]} />
-          <meshBasicMaterial color="#f8fafc" transparent opacity={0.9} />
-        </mesh>
-      )}
     </group>
   );
 }

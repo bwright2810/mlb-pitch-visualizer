@@ -163,6 +163,41 @@ export function calculateBallPosition(
 }
 
 /**
+ * Calculate the gravity-only reference path using the pitch's actual launch
+ * velocity. Unlike calculateBallPosition, this intentionally does not
+ * re-aim the pitch to the target after removing break forces.
+ */
+export function calculateNoBreakBallPosition(
+  params: TrajectoryParams,
+  progress: number,
+): THREE.Vector3 {
+  const {
+    releaseX, releaseY, releaseZ,
+    targetX, targetY,
+    velocityMph,
+    inducedVerticalBreak, horizontalBreak,
+  } = params;
+
+  const ivbFeet = inducedVerticalBreak / 12;
+  const hbFeet = horizontalBreak / 12;
+  const v0 = velocityMph * MPH_TO_FPS;
+  const distance = releaseZ - 0.5;
+  const tFlight = computeFlightTime(distance, v0);
+  const aMy = 2 * ivbFeet / (tFlight * tFlight);
+  const aMx = 2 * hbFeet / (tFlight * tFlight);
+  const vy0 = (targetY - releaseY) / tFlight - 0.5 * (-GRAVITY + aMy) * tFlight;
+  const vx0 = (targetX - releaseX) / tFlight - 0.5 * aMx * tFlight;
+  const t = progress * tFlight;
+  const zFromRelease = (1 / DRAG_K) * Math.log(1 + DRAG_K * v0 * t);
+
+  return new THREE.Vector3(
+    releaseX + vx0 * t,
+    Math.max(0.3, releaseY + vy0 * t - 0.5 * GRAVITY * t * t),
+    releaseZ - zFromRelease,
+  );
+}
+
+/**
  * Pre-compute an array of trajectory points for drawing the path.
  */
 export function calculateTrajectoryPoints(
