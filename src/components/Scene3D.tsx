@@ -132,61 +132,102 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
   );
 }
 
-function TrajectoryLine({ trajectory, progress, showResult }: {
+function getVisibleTrajectoryPoints(params: TrajectoryParams, progress: number, showResult: boolean) {
+  if (showResult) return calculateTrajectoryPoints(params, 120);
+  if (progress <= 0.02) return [];
+
+  const trailPoints: THREE.Vector3[] = [];
+  const startProgress = Math.max(0, progress - 0.15);
+  const numPoints = Math.max(2, Math.floor((progress - startProgress) * 150));
+  for (let i = 0; i <= numPoints; i++) {
+    const t = startProgress + (i / numPoints) * (progress - startProgress);
+    trailPoints.push(calculateBallPosition(params, t, false));
+  }
+  return trailPoints;
+}
+
+function TrajectoryLine({ trajectory, pitchColor, progress, showResult }: {
   trajectory: Pitch['trajectory'];
+  pitchColor: string;
   progress: number;
   showResult: boolean;
 }) {
   const params = useMemo(() => toTrajectoryParams(trajectory), [trajectory]);
+  const noBreakParams = useMemo(() => ({
+    ...params,
+    inducedVerticalBreak: 0,
+    horizontalBreak: 0,
+  }), [params]);
 
   const points = useMemo(() => {
-    if (showResult) return calculateTrajectoryPoints(params, 120);
-    if (progress > 0.02) {
-      const trailPoints: THREE.Vector3[] = [];
-      const startProgress = Math.max(0, progress - 0.15);
-      const numPoints = Math.max(2, Math.floor((progress - startProgress) * 150));
-      for (let i = 0; i <= numPoints; i++) {
-        const t = startProgress + (i / numPoints) * (progress - startProgress);
-        trailPoints.push(calculateBallPosition(params, t, false));
-      }
-      return trailPoints;
-    }
-    return [];
+    return getVisibleTrajectoryPoints(params, progress, showResult);
   }, [params, progress, showResult]);
+  const noBreakPoints = useMemo(() => {
+    return getVisibleTrajectoryPoints(noBreakParams, progress, showResult);
+  }, [noBreakParams, progress, showResult]);
 
-  if (points.length < 2) return null;
+  if (points.length < 2 || noBreakPoints.length !== points.length) return null;
 
-  const segmentDeltas = points.slice(1).map((point, index) => {
-    const previous = points[index];
-    return Math.hypot(point.x - previous.x, point.y - previous.y);
-  });
-  const maxDelta = Math.max(...segmentDeltas, 0.0001);
+  const breakOffsets = points.map((point, index) => ({
+    point,
+    baseline: noBreakPoints[index],
+    horizontal: point.x - noBreakPoints[index].x,
+    vertical: point.y - noBreakPoints[index].y,
+  }));
+  const breakThreshold = 0.25 / 12;
+  const firstBreakIndex = breakOffsets.findIndex(({ horizontal, vertical }) => (
+    Math.hypot(horizontal, vertical) >= breakThreshold
+  ));
+  const vectorStep = Math.max(1, Math.floor(points.length / 8));
+  const vectorIndices = breakOffsets
+    .map(({ horizontal, vertical }, index) => ({ horizontal, vertical, index }))
+    .filter(({ horizontal, vertical, index }) => (
+      index > 0 && index % vectorStep === 0 && Math.hypot(horizontal, vertical) >= breakThreshold
+    ));
 
-  // Each segment is colored by movement direction, with its shade tied to
-  // the size of that segment's delta. Vertical change trends cyan; horizontal
-  // change trends orange; mixed movement is blended toward violet.
   return (
     <group>
-      {points.slice(1).map((point, index) => {
-        const previous = points[index];
-        const horizontalDelta = Math.abs(point.x - previous.x);
-        const verticalDelta = Math.abs(point.y - previous.y);
-        const totalDelta = horizontalDelta + verticalDelta || 1;
-        const verticalShare = verticalDelta / totalDelta;
-        const hue = 25 + verticalShare * 165;
-        const deltaShare = segmentDeltas[index] / maxDelta;
-        const color = new THREE.Color().setHSL(hue / 360, 0.9, 0.42 + deltaShare * 0.22);
+      <Line
+        points={noBreakPoints}
+        color="#64748b"
+        lineWidth={1.25}
+        opacity={0.45}
+        dashed
+        dashSize={0.35}
+        gapSize={0.2}
+        transparent
+      />
+      <Line
+        points={points}
+        color={pitchColor}
+        lineWidth={3}
+        opacity={showResult ? 0.95 : 0.85}
+        transparent
+      />
+      {vectorIndices.map(({ horizontal, vertical, index }) => {
+        const horizontalShare = Math.abs(horizontal) / (Math.abs(horizontal) + Math.abs(vertical) || 1);
+        const color = new THREE.Color('#22d3ee').lerp(new THREE.Color('#f97316'), horizontalShare);
         return (
           <Line
-            key={index}
-            points={[previous, point]}
+            key={`break-vector-${index}`}
+            points={[noBreakPoints[index], points[index]]}
             color={color}
-            lineWidth={2.5}
-            opacity={showResult ? 0.85 : 0.7}
+            lineWidth={2}
+            opacity={0.9}
             transparent
           />
         );
       })}
+      {firstBreakIndex >= 0 && (
+        <mesh position={[
+          points[firstBreakIndex].x,
+          points[firstBreakIndex].y,
+          points[firstBreakIndex].z,
+        ]}>
+          <sphereGeometry args={[0.18, 16, 16]} />
+          <meshBasicMaterial color="#f8fafc" transparent opacity={0.9} />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -380,7 +421,12 @@ export default function Scene3D({
         onPositionUpdate={setBallPosition}
       />
 
-      <TrajectoryLine trajectory={pitch.trajectory} progress={progress} showResult={showResult} />
+      <TrajectoryLine
+        trajectory={pitch.trajectory}
+        pitchColor={pitch.color}
+        progress={progress}
+        showResult={showResult}
+      />
       <LandingIndicator trajectory={pitch.trajectory} showResult={showResult} />
 
       <CameraController
