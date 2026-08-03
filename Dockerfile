@@ -1,24 +1,28 @@
-FROM node:20-alpine
+# syntax=docker/dockerfile:1
+# Enable BuildKit cache mounts (DOCKER_BUILDKIT=1 is default on Docker 23+).
 
+# Stage 1: Install dependencies (cached layer)
+FROM node:20-alpine AS deps
 WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit
 
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies (including dev dependencies for build)
-RUN npm ci
-
-# Copy source code
+# Stage 2: Build (uses cached deps)
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-# Build the application
 RUN npm run build
 
-# Install only production dependencies
-RUN npm ci --omit=dev
+# Stage 3: Production (minimal image)
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
 
-# Expose port
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
 EXPOSE 3000
-
-# Start the application
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

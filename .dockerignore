@@ -1,0 +1,33 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies (installed inside the image via npm ci)
+node_modules
+
+# Build output (built inside the image)
+.next
+out
+build
+
+# Testing / CI artifacts
+tests
+test-results
+playwright-report
+coverage
+playwright.config.ts
+
+# Agent / editor cruft
+.pi-subagents
+.agents.*.swp
+.agents.md.swp
+*.swp
+*.swo
+.DS_Store
+
+# Docs & misc not needed at runtime/build
+PROJECT_SUMMARY.md
+README.md
+
+# Env files (never bake into images)
+.env*
