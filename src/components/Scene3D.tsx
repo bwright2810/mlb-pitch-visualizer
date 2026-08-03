@@ -15,6 +15,12 @@ const MOUND_TO_PLATE = 60.5;
 const STRIKE_ZONE_WIDTH = 1.42;
 const STRIKE_ZONE_HEIGHT = 1.84;
 const MOUND_HEIGHT = 0.61;
+const INITIAL_CAMERA_POS = new THREE.Vector3(2, 6.5, 63);
+const INITIAL_CAMERA_LOOK_AT = new THREE.Vector3(0, 5.5, 55);
+const ZONE_CAMERA_POS = new THREE.Vector3(3, 3, 10);
+const ZONE_CAMERA_LOOK_AT = new THREE.Vector3(0, 2.4, 0.5);
+const SIDE_CAMERA_POS = new THREE.Vector3(120, 10, 0);
+const SIDE_CAMERA_LOOK_AT = new THREE.Vector3(0, 2.5, 0);
 
 function toTrajectoryParams(trajectory: Pitch['trajectory']): TrajectoryParams {
   return {
@@ -85,7 +91,11 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
   onPositionUpdate?: (pos: THREE.Vector3) => void;
 }) {
   const spinGroupRef = useRef<THREE.Group>(null);
-  const [rotationSpeed, setRotationSpeed] = useState(0.1);
+  const rotationSpeed = isAnimating
+    ? trajectory.spinRateRpm > 1000
+      ? Math.min(trajectory.spinRateRpm / 1500, 3)
+      : 0.3
+    : 0.05;
 
   const params = useMemo(() => toTrajectoryParams(trajectory), [trajectory]);
   const currentPos = useMemo(() => calculateBallPosition(params, progress, showResult), [params, progress, showResult]);
@@ -93,13 +103,6 @@ function Baseball({ trajectory, isAnimating, progress, showResult, onPositionUpd
   useEffect(() => {
     if (onPositionUpdate) onPositionUpdate(currentPos);
   }, [currentPos, onPositionUpdate]);
-
-  useEffect(() => {
-    const spinMultiplier = trajectory.spinRateRpm > 1000
-      ? Math.min(trajectory.spinRateRpm / 1500, 3)
-      : 0.3;
-    setRotationSpeed(isAnimating ? spinMultiplier : 0.05);
-  }, [isAnimating, trajectory.spinRateRpm]);
 
   useFrame((_, delta) => {
     if (spinGroupRef.current) {
@@ -152,7 +155,32 @@ function TrajectoryLine({ trajectory, progress, showResult }: {
   }, [params, progress, showResult]);
 
   if (points.length < 2) return null;
-  return <Line points={points} color="#60a5fa" lineWidth={2} opacity={showResult ? 0.8 : 0.6} transparent />;
+
+  // Each segment is colored by the direction of its movement. Vertical
+  // change trends cyan; horizontal change trends orange; mixed movement is
+  // blended toward violet. This keeps color tied to movement, not velocity.
+  return (
+    <group>
+      {points.slice(1).map((point, index) => {
+        const previous = points[index];
+        const horizontalDelta = Math.abs(point.x - previous.x);
+        const verticalDelta = Math.abs(point.y - previous.y);
+        const totalDelta = horizontalDelta + verticalDelta || 1;
+        const verticalShare = verticalDelta / totalDelta;
+        const hue = 25 + verticalShare * 165;
+        return (
+          <Line
+            key={index}
+            points={[previous, point]}
+            color={`hsl(${hue}, 90%, 65%)`}
+            lineWidth={2.5}
+            opacity={showResult ? 0.85 : 0.7}
+            transparent
+          />
+        );
+      })}
+    </group>
+  );
 }
 
 function LandingIndicator({ trajectory, showResult }: {
@@ -256,51 +284,27 @@ function CameraController({
   ballPosition: THREE.Vector3;
 }) {
   const { camera } = useThree();
-  const currentPos = useRef(new THREE.Vector3(2, 6.5, 63));
-  const currentLookAt = useRef(new THREE.Vector3(0, 5.5, 55));
+  const currentPos = useRef(INITIAL_CAMERA_POS.clone());
+  const currentLookAt = useRef(INITIAL_CAMERA_LOOK_AT.clone());
 
-  // Define camera positions
-  const initialPos = new THREE.Vector3(2, 6.5, 63);
-  const initialLookAt = new THREE.Vector3(0, 5.5, 55);
-  
-  const zonePos = new THREE.Vector3(3, 3, 10);
-  const zoneLookAt = new THREE.Vector3(0, 2.4, 0.5);
-  
-  // Side view: perpendicular to home plate from right side, zoomed out
-  const sidePos = new THREE.Vector3(120, 10, 0);
-  const sideLookAt = new THREE.Vector3(0, 2.5, 0);
+  useEffect(() => {
+    if (isAnimating) return;
+    const targetPos = sideView ? SIDE_CAMERA_POS : showResult ? ZONE_CAMERA_POS : INITIAL_CAMERA_POS;
+    const targetLook = sideView ? SIDE_CAMERA_LOOK_AT : showResult ? ZONE_CAMERA_LOOK_AT : INITIAL_CAMERA_LOOK_AT;
+    camera.position.copy(targetPos);
+    camera.lookAt(targetLook);
+    currentPos.current.copy(targetPos);
+    currentLookAt.current.copy(targetLook);
+  }, [camera, isAnimating, showResult, sideView]);
 
   useFrame(() => {
-    // Side view: OrbitControls takes over
-    if (sideView && !isAnimating) {
-      return;
-    }
-
-    let targetPos: THREE.Vector3;
-    let targetLook: THREE.Vector3;
-    let speed = 0.05;
-
-    if (isAnimating) {
-      // Track ball
-      const camZ = ballPosition.z + 5;
-      const camX = ballPosition.x * 0.5 + 1.5;
-      const camY = Math.max(ballPosition.y + 2, 3);
-      targetPos = new THREE.Vector3(camX, camY, Math.max(camZ, 8));
-      targetLook = ballPosition.clone();
-      speed = 0.12;
-    } else if (sideView) {
-      targetPos = sidePos;
-      targetLook = sideLookAt;
-      speed = 0.03;
-    } else if (showResult) {
-      targetPos = zonePos;
-      targetLook = zoneLookAt;
-      speed = 0.04;
-    } else {
-      targetPos = initialPos;
-      targetLook = initialLookAt;
-      speed = 0.05;
-    }
+    if (!isAnimating) return;
+    const camZ = ballPosition.z + 5;
+    const camX = ballPosition.x * 0.5 + 1.5;
+    const camY = Math.max(ballPosition.y + 2, 3);
+    const targetPos = new THREE.Vector3(camX, camY, Math.max(camZ, 8));
+    const targetLook = ballPosition.clone();
+    const speed = 0.12;
 
     // Smooth lerp
     currentPos.current.lerp(targetPos, speed);
@@ -313,19 +317,15 @@ function CameraController({
   return null;
 }
 
-function SideViewControls({ enabled, touches }: { enabled: boolean; touches: boolean }) {
+function SideViewControls({ enabled }: { enabled: boolean }) {
   return (
     <OrbitControls
       enabled={enabled}
       enablePan={true}
       enableZoom={true}
       enableRotate={true}
-      touches={
-        touches
-          ? { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
-          : { ONE: 0 as any, TWO: 0 as any }
-      }
-      minDistance={50}
+      touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+      minDistance={5}
       maxDistance={300}
       target={[0, 2.5, 0]}
     />
@@ -347,7 +347,7 @@ export default function Scene3D({
 }) {
   const [ballPosition, setBallPosition] = useState(new THREE.Vector3(0, 5, 55));
 
-  const enableOrbitControls = sideView && !isAnimating;
+  const enableOrbitControls = !isAnimating;
 
   return (
     <Canvas
@@ -382,7 +382,7 @@ export default function Scene3D({
         ballPosition={ballPosition}
       />
 
-      <SideViewControls enabled={enableOrbitControls} touches={enableOrbitControls} />
+      <SideViewControls enabled={enableOrbitControls} />
 
       <Environment preset="sunset" />
     </Canvas>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Pitch, PITCH_TYPES } from '@/types/pitch';
 import { getFlightTimeMs } from '@/lib/trajectory';
@@ -20,6 +20,7 @@ const PitchHero: React.FC = () => {
   const [showResult, setShowResult] = useState(false);
   const [sideView, setSideView] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isPitchMenuOpen, setIsPitchMenuOpen] = useState(false);
 
   // Animation logic — uses real physics flight time
   const animatePitch = useCallback(() => {
@@ -63,11 +64,6 @@ const PitchHero: React.FC = () => {
     setSideView(false);
   }, []);
 
-  // Reset when pitch changes
-  useEffect(() => {
-    resetAnimation();
-  }, [selectedPitch]);
-
   const getDifficultyBadge = (difficulty: string) => {
     const colors: Record<string, string> = {
       'easy': 'bg-green-500/20 text-green-400 border-green-500/30',
@@ -85,6 +81,14 @@ const PitchHero: React.FC = () => {
       case 'both': return '⤴️';
       default: return '⚾';
     }
+  };
+
+  const getPitchIcon = (pitch: Pitch) => {
+    const icons: Record<string, string> = {
+      'fastball-4seam': '🔥', 'fastball-2seam': '🌀', curveball: '🌙',
+      slider: '⚡', changeup: '🍂', cutter: '✂️', splitter: '↘️', knuckleball: '🫧',
+    };
+    return icons[pitch.id] || '⚾';
   };
 
   // Calculate if pitch is a strike using target position at plate
@@ -122,36 +126,11 @@ const PitchHero: React.FC = () => {
 
       {/* Hero Section */}
       <main className="max-w-7xl mx-auto px-4 py-4 sm:py-6">
-        {/* Pitch Selector */}
-        <div className="mb-4 sm:mb-6">
-          <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            Select Pitch Type
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {PITCH_TYPES.map((pitch) => (
-              <button
-                key={pitch.id}
-                onClick={() => setSelectedPitch(pitch)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  selectedPitch.id === pitch.id
-                    ? 'text-white shadow-lg'
-                    : isDarkMode
-                      ? 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                      : 'bg-white text-gray-700 hover:bg-gray-100 shadow'
-                }`}
-                style={selectedPitch.id === pitch.id ? { backgroundColor: pitch.color } : {}}
-              >
-                {pitch.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div>
           {/* 3D Visualizer */}
-          <div className={`lg:col-span-2 rounded-2xl overflow-hidden shadow-2xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
-            <div className="aspect-[15/14] sm:aspect-[20/21] lg:aspect-[9/14] relative">
+          <div className={`rounded-2xl overflow-hidden shadow-2xl ${isDarkMode ? 'bg-gray-900' : 'bg-white'}`}>
+            <div className="aspect-[15/14] sm:aspect-[20/21] lg:aspect-[16/9] relative">
               <Scene3D
                 pitch={selectedPitch}
                 isAnimating={isAnimating}
@@ -159,6 +138,37 @@ const PitchHero: React.FC = () => {
                 showResult={showResult}
                 sideView={sideView}
               />
+
+              <div className="absolute top-4 left-4 z-10">
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={isPitchMenuOpen}
+                  onClick={() => setIsPitchMenuOpen((open) => !open)}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium shadow-lg backdrop-blur-md ${isDarkMode ? 'bg-gray-950/80 text-white' : 'bg-white/90 text-gray-900'}`}
+                >
+                  <span className="text-lg" aria-hidden="true">{getPitchIcon(selectedPitch)}</span>
+                  <span>{selectedPitch.name}</span>
+                  <span className="ml-1 text-xs opacity-70">⌄</span>
+                </button>
+                {isPitchMenuOpen && (
+                  <div role="menu" className={`absolute left-0 mt-2 w-64 overflow-hidden rounded-xl border p-1 shadow-2xl backdrop-blur-xl ${isDarkMode ? 'border-gray-700 bg-gray-950/95' : 'border-gray-200 bg-white/95'}`}>
+                    {PITCH_TYPES.map((pitch) => (
+                      <button
+                        key={pitch.id}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setSelectedPitch(pitch); resetAnimation(); setIsPitchMenuOpen(false); }}
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedPitch.id === pitch.id ? 'text-white' : isDarkMode ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                        style={selectedPitch.id === pitch.id ? { backgroundColor: pitch.color } : undefined}
+                      >
+                        <span className="w-6 text-center text-lg" aria-hidden="true">{getPitchIcon(pitch)}</span>
+                        <span>{pitch.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Overlay controls */}
               <div className="absolute bottom-2 left-2 right-2">
@@ -185,7 +195,7 @@ const PitchHero: React.FC = () => {
                   >
                     {isAnimating ? '🔄 Pitching...' : '▶️ Throw'}
                   </button>
-                  {showResult && !isAnimating && (
+                  {!isAnimating && (
                     <button
                       onClick={() => setSideView(!sideView)}
                       className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
@@ -211,7 +221,7 @@ const PitchHero: React.FC = () => {
               </div>
 
               {/* Pitch name overlay */}
-              <div className="absolute top-4 left-4">
+              <div className="absolute top-20 left-4 pointer-events-none">
                 <h2 className="text-2xl sm:text-3xl font-bold drop-shadow-lg" style={{ color: selectedPitch.color }}>
                   {selectedPitch.name}
                 </h2>
@@ -234,8 +244,13 @@ const PitchHero: React.FC = () => {
             </div>
           </div>
 
-          {/* Stats Panel */}
-          <div className="space-y-4">
+          <p className={`mt-4 text-base leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+            {selectedPitch.description}
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          {/* All pitch details in one card */}
+          <div className={`lg:col-span-2 rounded-2xl p-4 ${isDarkMode ? 'bg-gray-900' : 'bg-white shadow'}`}>
             {/* Quick Stats */}
             <div className={`grid grid-cols-2 gap-3 ${isDarkMode ? 'text-white' : ''}`}>
               <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
@@ -262,39 +277,25 @@ const PitchHero: React.FC = () => {
             <div className={`grid grid-cols-2 gap-3 ${isDarkMode ? 'text-white' : ''}`}>
               <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
                 <div className={`text-lg font-bold ${selectedPitch.trajectory.inducedVerticalBreak >= 0 ? 'text-cyan-400' : 'text-orange-400'}`}>
-                  {selectedPitch.trajectory.inducedVerticalBreak > 0 ? '+' : ''}{selectedPitch.trajectory.inducedVerticalBreak}"
+                  {selectedPitch.trajectory.inducedVerticalBreak > 0 ? '+' : ''}{selectedPitch.trajectory.inducedVerticalBreak}&quot;
                 </div>
                 <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Induced Vert Break</div>
               </div>
               <div className={`p-3 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
                 <div className={`text-lg font-bold ${selectedPitch.trajectory.horizontalBreak >= 0 ? 'text-cyan-400' : 'text-orange-400'}`}>
-                  {selectedPitch.trajectory.horizontalBreak > 0 ? '+' : ''}{selectedPitch.trajectory.horizontalBreak}"
+                  {selectedPitch.trajectory.horizontalBreak > 0 ? '+' : ''}{selectedPitch.trajectory.horizontalBreak}&quot;
                 </div>
                 <div className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Horizontal Break</div>
               </div>
             </div>
 
-            {/* Description */}
-            <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
-              <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : ''}`}>About This Pitch</h3>
-              <p className={`text-sm leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                {selectedPitch.description}
-              </p>
-            </div>
-
-            {/* Grip Section */}
-            <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
-              <h3 className={`text-lg font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>🖐️ Grip & Release</h3>
-              <GripVisualization pitch={selectedPitch} />
-            </div>
-
             {/* Extended Info */}
-            <div className={`space-y-3 ${isDarkMode ? 'text-white' : ''}`}>
-              <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
+            <div className={`mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 ${isDarkMode ? 'text-white' : ''}`}>
+              <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-gray-50'}`}>
                 <h4 className="font-semibold text-gray-400 text-sm mb-1">When to Use</h4>
                 <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>{selectedPitch.usage}</p>
               </div>
-              <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-white shadow'}`}>
+              <div className={`p-4 rounded-xl ${isDarkMode ? 'bg-gray-800/50' : 'bg-gray-50'}`}>
                 <h4 className="font-semibold text-gray-400 text-sm mb-1">Break Direction</h4>
                 <p className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
                   {selectedPitch.breakDirection === 'vertical' && 'Primary vertical movement (up/down)'}
@@ -303,6 +304,11 @@ const PitchHero: React.FC = () => {
                 </p>
               </div>
             </div>
+          </div>
+          <div className={`rounded-2xl p-4 ${isDarkMode ? 'bg-gray-900' : 'bg-white shadow'}`}>
+            <h3 className={`text-lg font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>🖐️ Grip & Release</h3>
+            <GripVisualization pitch={selectedPitch} />
+          </div>
           </div>
         </div>
       </main>
